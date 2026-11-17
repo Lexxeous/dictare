@@ -50,3 +50,25 @@ def test_review_retains_unbound_destinations_without_sending():
     assert draft is not None and draft.messages[0]["text"] == "private"
     assert engine.send_review(draft.id) == "failed"
     assert engine.review_snapshot().id == draft.id
+
+
+def test_restart_and_shutdown_do_not_discard_pending_draft():
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine._review_enabled = True
+    engine.inject_text("private", agent=None)
+    draft = engine.review_snapshot()
+    assert draft is not None
+    for command in ("engine.restart", "engine.shutdown", "stt.start", "stt.toggle"):
+        result = engine.handle_protocol_command({"command": command})
+        assert result["status"] == "error"
+        assert engine.review_snapshot().id == draft.id
+
+
+def test_capture_after_protocol_exit_request_is_not_delivered():
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    target = Mock()
+    target.id = "codex"
+    engine.requested_exit_reason = "protocol_restart"
+    engine.inject_text("late result", agent=target)
+    target.send.assert_not_called()
+    assert engine.review_snapshot() is None

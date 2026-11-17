@@ -43,3 +43,9 @@ test("lost connection remains unconfirmed instead of claiming success", async (t
 	t.mock.method(globalThis, "fetch", async () => { throw new TypeError("connection lost"); });
 	await assert.rejects(stopEngine, /connection lost/);
 });
+
+test("restart reports a refused review guard instead of claiming success", async (t) => {
+	const { restartEngine } = await import("../src/lib/api.ts");
+	t.mock.method(globalThis, "fetch", async () => Response.json({ status: "error", error: "Send or discard the pending prompt before continuing." }));
+	await assert.rejects(restartEngine, /Send or discard/);
+});

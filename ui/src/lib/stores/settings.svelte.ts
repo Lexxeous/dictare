@@ -283,7 +283,12 @@ export async function saveAll(): Promise<void> {
 		saveStatus = "saved";
 		// Auto-restart engine — EngineStatusBar will poll and call load()
 		// when the engine is back up, which reloads the full schema.
-		await restartEngine();
+		try {
+			await restartEngine();
+		} catch (error) {
+			saveErrors = { settings: `Settings were saved, but Dictare did not restart. ${(error as Error).message}` };
+			saveStatus = "error";
+		}
 	} else {
 		saveErrors = errors;
 		saveStatus = "error";

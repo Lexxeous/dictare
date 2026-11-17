@@ -266,15 +266,21 @@ export async function setOutputMode(mode: "keyboard" | "agents"): Promise<void> 
 }
 
 export async function restartEngine(): Promise<void> {
+	let response: Response;
 	try {
-		await fetch(`${OPENVIP}/control`, {
+		response = await fetch(`${OPENVIP}/control`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ command: "engine.restart" })
 		});
 	} catch {
-		// Expected: engine shuts down mid-restart, connection drops
+		// The engine may close the connection while restarting.
+		return;
 	}
+	if (!response.ok) throw new Error(`Restart request failed: ${response.status}`);
+	let result: { status?: string; error?: string };
+	try { result = await response.json(); } catch { return; }
+	if (result.status !== "ok") throw new Error(result.error || "Dictare did not accept the restart request");
 }
 
 export async function stopEngine(): Promise<void> {
@@ -286,7 +292,7 @@ export async function stopEngine(): Promise<void> {
 	});
 	if (!response.ok) throw new Error(`Stop request failed: ${response.status}`);
 	const result = await response.json();
-	if (result.status !== "ok") throw new Error("Engine did not accept the stop request");
+	if (result.status !== "ok") throw new Error(result.error || "Engine did not accept the stop request");
 }
 
 // ----- TTS Venv Install/Uninstall API -----

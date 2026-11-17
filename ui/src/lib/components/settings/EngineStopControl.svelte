@@ -18,8 +18,8 @@
 				(message) => window.confirm(message), stopEngine, settingsStore.hasDirtyFields()
 			);
 			if (accepted) settingsStore.setEngineShutdownRequested(true);
-		} catch {
-			error = "Could not confirm that Dictare stopped. Check the tray before trying again.";
+		} catch (cause) {
+			error = (cause as Error).message || "Could not confirm that Dictare stopped. Check the tray before trying again.";
 		} finally {
 			pending = false;
 		}

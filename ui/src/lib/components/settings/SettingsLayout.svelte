@@ -100,6 +100,7 @@
 	const fixedBottomPx = $derived(getFixedBottomPx());
 
 	let restarting = $state(false);
+	let restartError = $state("");
 	let launchAtLogin = $state<boolean | null>(null);
 	let doctor = $state<PermissionDoctorStatus | null>(null);
 	let probing = $state(false);
@@ -153,7 +154,14 @@
 
 	async function handleRestart() {
 		restarting = true;
-		await restartEngine();
+		restartError = "";
+		try {
+			await restartEngine();
+		} catch (error) {
+			restartError = (error as Error).message;
+			restarting = false;
+			return;
+		}
 		// Poll until engine is healthy again
 		while (true) {
 			await new Promise<void>((r) => setTimeout(r, 1000));
@@ -341,6 +349,7 @@
 										<Button variant="destructive" onclick={runRecommendedFix}>Open Recommended Fix</Button>
 									{/if}
 								</div>
+								{#if restartError}<p role="alert" class="text-sm text-destructive">{restartError}</p>{/if}
 								<div class="flex items-center gap-2">
 									<Button variant="destructive" onclick={handleRestart} disabled={restarting}>
 										<RotateCcw class="size-3.5 mr-1.5 {restarting ? 'animate-spin' : ''}" />

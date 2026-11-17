@@ -16,7 +16,7 @@
 	>
 		<div class="max-w-[50rem] mx-auto flex items-center justify-end gap-3">
 			{#if status === "error"}
-				<span class="text-sm text-destructive mr-auto">Some fields had errors</span>
+				<span role="alert" class="text-sm text-destructive mr-auto">{settingsStore.getSaveErrors().settings || "Some fields had errors"}</span>
 			{/if}
 			{#if hasDirty}
 				<Button

@@ -934,7 +934,8 @@ class DictareEngine:
     def inject_text(self, text: str, *, agent: Agent | None = None, language: str | None = None, capture_generation: int | None = None) -> None:
         """Reject canceled capture before filters, executors, delivery or feedback."""
         with self._injection_lock:
-            if self.capture_allowed(capture_generation):
+            if (self.requested_exit_reason not in {"protocol_shutdown", "protocol_restart", "signal_shutdown"}
+                    and self.capture_allowed(capture_generation)):
                 self._inject_text_current(text, agent=agent, language=language)
 
     def _inject_text_current(self, text: str, *, agent: Agent | None = None, language: str | None = None) -> None:
@@ -1577,6 +1578,12 @@ class DictareEngine:
         """
         command = body.get("command", "")
 
+        if command in {"stt.start", "stt.toggle"} and self.review_pending():
+            return {
+                "openvip": "1.0", "status": "error",
+                "error": "Send or discard the pending prompt before continuing.",
+            }
+
         if command == "stt.start":
             self.set_listening(True)
             return {"openvip": "1.0", "status": "ok", "listening": True}
@@ -1586,22 +1593,24 @@ class DictareEngine:
         elif command == "stt.toggle":
             self.toggle_listening()
             return {"openvip": "1.0", "status": "ok"}
-        elif command == "engine.shutdown":
-            from dictare.process_exit import EXIT_OK
+        elif command in {"engine.shutdown", "engine.restart"}:
+            from dictare.process_exit import EXIT_OK, EXIT_RESTART_REQUESTED
 
-            logger.info("protocol_command: engine.shutdown")
-            self.save_session_before_shutdown()
-            self.request_process_exit(EXIT_OK, "protocol_shutdown")
-            return {"openvip": "1.0", "status": "ok"}
-        elif command == "engine.restart":
-            from dictare.process_exit import EXIT_RESTART_REQUESTED
-
-            logger.info("protocol_command: engine.restart")
-            self.save_session_before_shutdown()
-            self.request_process_exit(
-                EXIT_RESTART_REQUESTED,
-                "protocol_restart",
-            )
+            # Serialize the pending-draft check with capture/delivery. Once an
+            # exit is requested, inject_text rejects late results as well.
+            with self._injection_lock:
+                if self.review_pending():
+                    return {
+                        "openvip": "1.0", "status": "error",
+                        "error": "Send or discard the pending prompt before continuing.",
+                    }
+                logger.info("protocol_command: %s", command)
+                self.save_session_before_shutdown()
+                restarting = command == "engine.restart"
+                self.request_process_exit(
+                    EXIT_RESTART_REQUESTED if restarting else EXIT_OK,
+                    "protocol_restart" if restarting else "protocol_shutdown",
+                )
             return {"openvip": "1.0", "status": "ok"}
         elif command == "ping":
             return {"openvip": "1.0", "status": "ok", "pong": True}
