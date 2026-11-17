@@ -200,6 +200,23 @@ def register_openvip_routes(app: FastAPI, server: OpenVIPServer) -> None:
         server.engine.complete_tts(message_id, ok=ok, duration_ms=duration_ms)
         return {"status": "ok"}
 
+    @app.get("/internal/tts/interrupt")
+    async def tts_interrupt_request(request: Request):
+        if not server.has_permission(request, "register_tts"):
+            raise HTTPException(status_code=403, detail="Forbidden")
+        return JSONResponse(
+            {"interrupt_id": server.engine.tts_mgr.strict_interrupt_id()},
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.post("/internal/tts/interrupt")
+    async def tts_interrupt_ack(request: Request):
+        if not server.has_permission(request, "register_tts"):
+            raise HTTPException(status_code=403, detail="Forbidden")
+        body = await request.json()
+        accepted = server.engine.tts_mgr.acknowledge_strict_interrupt(str(body.get("interrupt_id", "")))
+        return {"accepted": accepted}
+
     @app.get("/internal/tts/permit/{message_id}")
     async def tts_playback_permit(message_id: str, request: Request):
         """Worker checks its scoped, still-pending request before playback."""

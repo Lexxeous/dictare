@@ -33,11 +33,13 @@ logger = logging.getLogger(__name__)
 
 # Set when a stop signal is received; cleared after each request completes.
 _stop_requested = False
+_interrupt_ack_requested = False
 
 def _handle_stop_signal(signum: int, frame: object) -> None:
     """SIGUSR2 handler: kill the current audio subprocess."""
-    global _stop_requested
+    global _stop_requested, _interrupt_ack_requested
     _stop_requested = True
+    _interrupt_ack_requested = True
     from dictare.tts.base import stop_audio_native
     stop_audio_native()
 
@@ -71,12 +73,46 @@ def _post_completion(
     except Exception:
         logger.warning("Failed to post TTS completion for %s", message_id, exc_info=True)
 
+def _acknowledge_interruption(url: str, token: str) -> None:
+    """Wait for all tracked players to stop before acknowledging a mute."""
+    from dictare.tts.base import stop_audio_native
+
+    headers = {"Authorization": f"Bearer {token}", "Cache-Control": "no-store"}
+    try:
+        req = urllib.request.Request(f"{url.rstrip('/')}/internal/tts/interrupt", headers=headers)
+        with urllib.request.urlopen(req, timeout=2) as response:
+            interrupt_id = json.loads(response.read()).get("interrupt_id")
+        if not interrupt_id or not stop_audio_native(wait=True):
+            return
+        body = json.dumps({"interrupt_id": interrupt_id}).encode()
+        req = urllib.request.Request(
+            f"{url.rstrip('/')}/internal/tts/interrupt", data=body,
+            headers={**headers, "Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=2) as response:
+            response.read()
+    except Exception:
+        logger.warning("Failed to acknowledge TTS interruption")
+
+
+def _interrupt_ack_loop(url: str, token: str) -> None:
+    """Handle signal acknowledgements off the signal-handling thread."""
+    import time
+
+    global _interrupt_ack_requested
+    while True:
+        if _interrupt_ack_requested:
+            _interrupt_ack_requested = False
+            _acknowledge_interruption(url, token)
+        time.sleep(0.05)
+
+
 def _playback_permitted(url: str, token: str, message_id: str) -> bool:
     """Ask the owning engine if this worker request is still authorized."""
     from urllib.parse import quote
 
     req = urllib.request.Request(
-        f"{url}/internal/tts/permit/{quote(message_id, safe='')}",
+        f"{url.rstrip('/')}/internal/tts/permit/{quote(message_id, safe='')}",
         headers={"Authorization": f"Bearer {token}", "Cache-Control": "no-store"},
     )
     try:
@@ -100,6 +136,13 @@ def main(argv: list[str] | None = None) -> None:
     token = os.environ.get("DICTARE_TTS_TOKEN") or args.token
     if not token:
         parser.error("DICTARE_TTS_TOKEN is required")
+
+    import threading
+
+    threading.Thread(
+        target=_interrupt_ack_loop, args=(args.url, token), daemon=True,
+        name="tts-interrupt-ack",
+    ).start()
 
     from dictare.utils.paths import get_data_dir
 
@@ -181,8 +224,6 @@ def main(argv: list[str] | None = None) -> None:
         else:
             _consecutive_403 = 0
             logger.warning("Disconnected: %s", exc)
-
-    import threading
 
     from dictare.tts.base import native_playback_permit, play_audio_native
 

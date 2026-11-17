@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -64,8 +65,8 @@ def _native_permitted() -> bool:
         return False
 
 
-def stop_audio_native() -> bool:
-    """Interrupt all currently tracked native players."""
+def stop_audio_native(*, wait: bool = False) -> bool:
+    """Interrupt all tracked players; optionally wait for them to exit."""
     with _audio_lock:
         processes = list(_audio_processes)
         for proc in processes:
@@ -73,7 +74,18 @@ def stop_audio_native() -> bool:
                 proc.terminate()
             except (ProcessLookupError, OSError):
                 pass
-    return bool(processes)
+    if wait:
+        deadline = time.monotonic() + 2.0
+        for proc in processes:
+            try:
+                proc.wait(timeout=max(0.0, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                try:
+                    proc.kill()
+                    proc.wait(timeout=0.5)
+                except (OSError, subprocess.TimeoutExpired):
+                    return False
+    return bool(processes) if not wait else True
 
 
 def suspend_native_audio() -> None:

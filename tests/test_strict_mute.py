@@ -119,3 +119,12 @@ def test_strict_mute_rejects_new_tts_requests():
     engine.tts_mgr.speak_text.assert_not_called()
     engine.tts_mgr.speak_agent.assert_not_called()
     engine.tts_mgr.handle_speech.assert_not_called()
+
+
+def test_unconfirmed_worker_interrupt_is_not_silently_marked_safe():
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine.tts_mgr = MagicMock()
+    engine.tts_mgr.suspend_for_strict.return_value = False
+    engine.strict_mute()
+    assert engine._strict_muted
+    assert "did not confirm" in engine._strict_audio_error

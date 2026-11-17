@@ -84,3 +84,61 @@ def test_manager_revokes_worker_requests_before_stop_and_resume():
     manager.resume_after_strict()
     proxy.resume_requests.assert_called_once()
     assert not manager._strict_suspended
+
+
+def test_worker_interrupt_ack_requires_token_and_current_id():
+    from dictare.config import Config
+    from dictare.core.tts_manager import TTSManager
+
+    engine = MagicMock()
+    engine.tts_mgr = TTSManager(Config())
+    engine.tts_mgr._strict_interrupt_id = "current"
+    server = OpenVIPServer(engine, auth_tokens={"register_tts": "secret"})
+    client = TestClient(server._app)
+    assert client.get("/internal/tts/interrupt").status_code == 403
+    assert client.post("/internal/tts/interrupt", json={"interrupt_id": "current"}).status_code == 403
+    auth = {"Authorization": "Bearer secret"}
+    assert client.get("/internal/tts/interrupt", headers=auth).json() == {"interrupt_id": "current"}
+    assert client.post("/internal/tts/interrupt", headers=auth, json={"interrupt_id": "old"}).json() == {"accepted": False}
+    assert client.post("/internal/tts/interrupt", headers=auth, json={"interrupt_id": "current"}).json() == {"accepted": True}
+    assert engine.tts_mgr._strict_interrupt_ack.is_set()
+
+
+def test_worker_acknowledges_only_after_tracked_audio_stops(monkeypatch):
+    import json
+    from unittest.mock import patch
+
+    from dictare.tts.worker import _acknowledge_interruption
+
+    response = MagicMock()
+    response.__enter__.return_value.read.return_value = json.dumps({"interrupt_id": "nonce"}).encode()
+    with patch("urllib.request.urlopen", return_value=response) as send, \
+         patch("dictare.tts.base.stop_audio_native", return_value=True) as stop:
+        _acknowledge_interruption("http://localhost:8770/", "secret")
+        stop.assert_called_once_with(wait=True)
+        assert send.call_count == 2
+        request = send.call_args_list[1].args[0]
+        assert json.loads(request.data) == {"interrupt_id": "nonce"}
+        assert request.get_header("Authorization") == "Bearer secret"
+    with patch("urllib.request.urlopen", return_value=response) as send, \
+         patch("dictare.tts.base.stop_audio_native", return_value=False):
+        _acknowledge_interruption("http://localhost:8770", "secret")
+        assert send.call_count == 1
+
+
+def test_worker_ack_timeout_keeps_requests_suspended():
+    from dictare.config import Config
+    from dictare.core.tts_manager import TTSManager
+
+    manager = TTSManager(Config())
+    proxy = MagicMock()
+    manager._tts_proxy = proxy
+    manager._tts_worker_process = MagicMock()
+    manager._worker_ready = True
+    manager._strict_interrupt_ack = MagicMock()
+    manager._strict_interrupt_ack.wait.return_value = False
+    manager.stop_speaking = lambda: True
+    assert not manager.suspend_for_strict()
+    proxy.suspend_requests.assert_called_once()
+    assert manager._strict_suspended
+    assert manager.strict_interrupt_id() is None

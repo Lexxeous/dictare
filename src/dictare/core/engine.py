@@ -219,6 +219,7 @@ class DictareEngine:
         self._voice_muted = False
         # Separate from standard voice mute; not yet exposed in the UI.
         self._strict_muted = False
+        self._strict_audio_error: str | None = None
         self._strict_mute_transition_lock = threading.Lock()
         self._capture_generation = 0  # Independent of hung-worker recovery.
 
@@ -1326,11 +1327,14 @@ class DictareEngine:
                 if self._strict_muted:
                     return
                 self._strict_muted = True
+                self._strict_audio_error = None
                 try:
                     # Revoke worker permits before waiting for VAD or device
                     # shutdown, so queued synthesis cannot start meanwhile.
-                    self.tts_mgr.suspend_for_strict()
+                    if self.tts_mgr.suspend_for_strict() is False:
+                        self._strict_audio_error = "Speech worker did not confirm it stopped."
                 except Exception:
+                    self._strict_audio_error = "Could not stop speech playback."
                     logger.exception("Could not stop speech playback")
                 self.discard_current_internal()
                 self._controller.send(StrictMuted(source="strict_mute"))
@@ -1338,6 +1342,7 @@ class DictareEngine:
             try:
                 suspend_feedback()
             except Exception:
+                self._strict_audio_error = "Could not stop feedback output."
                 logger.exception("Could not stop feedback output")
             # Native lifecycle operations run on the audio owner, not the VAD
             # callback thread. The processing gate remains closed on failure.
@@ -1345,6 +1350,7 @@ class DictareEngine:
                 try:
                     self.audio_manager.suspend_input()
                 except Exception:
+                    self._strict_audio_error = "Could not close the microphone input."
                     logger.exception("Could not close strict-muted input")
             self._notify_status()
 
@@ -1358,6 +1364,7 @@ class DictareEngine:
                 try:
                     self.audio_manager.resume_input()
                 except Exception:
+                    self._strict_audio_error = "Could not reopen the microphone input."
                     logger.exception("Could not reopen strict-muted input")
                     return
             with self._injection_lock:
@@ -1365,6 +1372,7 @@ class DictareEngine:
                 if not pending:
                     self.discard_current_internal()
                     self._strict_muted = False
+                    self._strict_audio_error = None
                     self._voice_muted = False
                     self._controller.send(SetListening(on=True, source="strict_resume"))
             if pending:
