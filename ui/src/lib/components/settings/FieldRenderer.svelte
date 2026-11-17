@@ -7,6 +7,7 @@
 	import ComplexField from "./fields/ComplexField.svelte";
 	import TomlField from "./fields/TomlField.svelte";
 	import NestedSettings from "./fields/NestedSettings.svelte";
+	import SoundSettings from "./fields/SoundSettings.svelte";
 	import ShortcutsField from "./fields/ShortcutsField.svelte";
 	import KeyCaptureField from "./fields/KeyCaptureField.svelte";
 	import { resolveFieldSchema, getEnumValues } from "$lib/schema";
@@ -71,7 +72,12 @@
 	const currentValue = $derived(settingsStore.getValue(field.key));
 	const isDirty = $derived(field.key in settingsStore.getDirty());
 	const error = $derived(settingsStore.getSaveErrors()[field.key]);
-	const label = $derived(LABEL_OVERRIDES[field.key] ?? humanize(field.key));
+	const soundLabels: Record<string, string> = {
+		enabled: "Enabled", path: "Sound file", volume: "Volume", focus_gated: "Only when unfocused",
+	};
+	const label = $derived(LABEL_OVERRIDES[field.key] ??
+		(field.key.startsWith("audio.sounds.") ? soundLabels[field.key.split(".").at(-1) ?? ""] : undefined) ??
+		humanize(field.key));
 	const size = $derived((SIZE_HINTS[field.key] ?? "normal") as "narrow" | "medium" | "normal");
 	const align = $derived(RIGHT_ALIGN_FIELDS.has(field.key) ? "right" as const : "left" as const);
 
@@ -139,6 +145,8 @@
 	<div class="px-4">
 		<ShortcutsField />
 	</div>
+{:else if field.key === "audio.sounds"}
+	<SoundSettings {schema} defaults={field.default} />
 {:else if field.key === "audio.advanced" || field.key === "stt.advanced"}
 	<NestedSettings section={field.key} {schema} />
 {:else if isTomlEditable}

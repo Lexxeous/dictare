@@ -122,3 +122,28 @@ def test_invalid_nested_choice_does_not_save_other_fields(path):
     with pytest.raises(ValidationError):
         set_config_values({"editor": "new", "stt.advanced.device": "imaginary"}, path)
     assert path.read_bytes() == original
+
+
+def test_sound_fields_use_event_defaults_and_preserve_other_events(path):
+    path.write_text('[audio.sounds.transcribed]\nvolume = 0.6 # keep\nfuture = "yes"\n[audio.sounds.ready]\nenabled = false\n')
+    set_config_values({'audio.sounds.transcribed.volume': '0.4', 'audio.sounds.start.enabled': 'false'}, path)
+    assert load_config(path).audio.sounds['transcribed'].volume == 0.4
+    assert not load_config(path).audio.sounds['start'].enabled
+    assert 'future = "yes"' in path.read_text()
+    assert '# keep' in path.read_text()
+    assert not load_config(path).audio.sounds['ready'].enabled
+    set_config_values({'audio.sounds.transcribed.volume': None, 'audio.sounds.start.enabled': None}, path)
+    assert load_config(path).audio.sounds['transcribed'].volume == 1.0
+    assert load_config(path).audio.sounds['start'].enabled
+
+
+def test_sound_invalid_volume_or_unknown_event_is_atomic(path):
+    from pydantic import ValidationError
+
+    original = path.read_bytes()
+    with pytest.raises(ValidationError):
+        set_config_values({'editor': 'new', 'audio.sounds.start.volume': '2'}, path)
+    assert path.read_bytes() == original
+    with pytest.raises(KeyError):
+        set_config_values({'editor': 'new', 'audio.sounds.imaginary.enabled': 'true'}, path)
+    assert path.read_bytes() == original
