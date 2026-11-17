@@ -68,6 +68,15 @@ For local work in a personal fork, follow the fork's integration-branch policy.
 The repository-specific agent guide describes the `develop`-based workflow used
 for this checkout.
 
+Feature branches start from `develop` and merge back after validation. Main
+receives selected validated develop batches and is the release branch. Track
+patch/minor intent in a public `.changes/<request-name>.toml` with each
+implementation; recalculate its target using `scripts/release_plan.py` against
+fresh main refs/tags before pushing or merging. Fixed future versions in
+feature branches become stale when merge order changes. The initial pending
+release is 0.7.0; later targets follow the latest main stable release and the
+highest intent in the batch. See the feature workflow for exact gates.
+
 ## Code and Documentation
 
 - Follow existing patterns and module boundaries. Add type hints to new Python
