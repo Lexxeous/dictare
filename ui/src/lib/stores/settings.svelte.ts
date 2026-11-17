@@ -1,3 +1,4 @@
+import { conflictingSections } from "$lib/settings-conflicts";
 import { fetchSchema, saveSettings, saveTomlSection, saveShortcuts, selectCapability, restartEngine, type Shortcut, type StatusResponse } from "$lib/api";
 import type { SchemaResponse } from "$lib/types";
 
@@ -208,6 +209,14 @@ export function updateDeviceLists(status: StatusResponse): void {
 }
 
 export async function saveAll(): Promise<void> {
+	// A raw fragment replaces its section after form values are saved. Refuse
+	// overlapping edits before any writes so neither version silently wins.
+	const conflicts = conflictingSections(dirty, dirtyToml);
+	if (conflicts.length) {
+		saveErrors = { settings: `Both form and advanced text changed for ${conflicts.join(", ")}. Cancel the changes, then save one editing mode at a time.` };
+		saveStatus = "error";
+		return;
+	}
 	saveStatus = "saving";
 	saveErrors = {};
 	const errors: Record<string, string> = {};
