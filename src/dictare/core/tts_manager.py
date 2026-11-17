@@ -55,6 +55,8 @@ class TTSManager:
         self._tts_error: str = ""
         self._tts_proxy: Any = None  # WorkerTTSEngine (set when using worker)
         self._tts_worker_process: Any = None  # subprocess.Popen for TTS worker
+        self._strict_suspended = False
+        self._strict_lock = threading.Lock()
 
         # Play counter for mic-pausing: mic stays paused while any play is active.
         # Incremented before speak(), decremented after. 0→1 pauses mic, N→0 resumes.
@@ -251,8 +253,11 @@ class TTSManager:
 
         # Create proxy engine — it will wait for worker to connect
         proxy = WorkerTTSEngine(http_server)
-        self._tts_proxy = proxy
-        self._tts_engine = proxy
+        with self._strict_lock:
+            if self._strict_suspended:
+                proxy.suspend_requests()
+            self._tts_proxy = proxy
+            self._tts_engine = proxy
 
         # Wait for worker to connect, polling for early crash every 0.5s
         deadline = time.monotonic() + _TTS_WORKER_CONNECT_TIMEOUT
@@ -320,6 +325,8 @@ class TTSManager:
         Args:
             text: Text to speak.
         """
+        if self._strict_suspended:
+            return
         if self._tts_error:
             logger.warning("speak_text: TTS failed to load: %s", self._tts_error)
             return
@@ -387,6 +394,8 @@ class TTSManager:
         Raises:
             ValueError: If requested engine differs from configured engine.
         """
+        if self._strict_suspended:
+            return {"openvip": "1.0", "status": "error", "error": "Strict mute is active"}
         text = body.get("text", "")
         if not text:
             return {"openvip": "1.0", "status": "error", "error": "No text provided"}
@@ -545,6 +554,21 @@ class TTSManager:
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
+
+    def suspend_for_strict(self) -> None:
+        """Revoke worker requests before interrupting currently playing speech."""
+        with self._strict_lock:
+            self._strict_suspended = True
+            if self._tts_proxy is not None:
+                self._tts_proxy.suspend_requests()
+        self.stop_speaking()
+
+    def resume_after_strict(self) -> None:
+        """Allow only newly submitted worker requests after explicit resume."""
+        with self._strict_lock:
+            if self._tts_proxy is not None:
+                self._tts_proxy.resume_requests()
+            self._strict_suspended = False
 
     def stop_speaking(self) -> bool:
         """Interrupt the currently playing audio.

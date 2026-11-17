@@ -66,3 +66,21 @@ def test_worker_checks_token_and_fails_closed(monkeypatch):
         assert request.full_url.endswith("/request%2Fid")
     with patch("urllib.request.urlopen", side_effect=OSError("offline")):
         assert not _playback_permitted("http://localhost:8770", "secret", "id")
+
+
+def test_manager_revokes_worker_requests_before_stop_and_resume():
+    from dictare.config import Config
+    from dictare.core.tts_manager import TTSManager
+
+    manager = TTSManager(Config())
+    order = []
+    proxy = MagicMock()
+    proxy.suspend_requests.side_effect = lambda: order.append("revoke")
+    manager._tts_proxy = proxy
+    manager.stop_speaking = lambda: order.append("stop") or True
+    manager.suspend_for_strict()
+    assert order == ["revoke", "stop"]
+    assert manager.handle_speech({"text": "ignored"})["status"] == "error"
+    manager.resume_after_strict()
+    proxy.resume_requests.assert_called_once()
+    assert not manager._strict_suspended

@@ -357,6 +357,8 @@ class DictareEngine:
 
         self._voice_muted = saved_muted
         self._strict_muted = saved_strict_muted
+        if saved_strict_muted:
+            self.tts_mgr.suspend_for_strict()
 
         return False if saved_strict_muted else saved_listening
 
@@ -1324,6 +1326,12 @@ class DictareEngine:
                 if self._strict_muted:
                     return
                 self._strict_muted = True
+                try:
+                    # Revoke worker permits before waiting for VAD or device
+                    # shutdown, so queued synthesis cannot start meanwhile.
+                    self.tts_mgr.suspend_for_strict()
+                except Exception:
+                    logger.exception("Could not stop speech playback")
                 self.discard_current_internal()
                 self._controller.send(StrictMuted(source="strict_mute"))
             suspend_native_audio()
@@ -1338,10 +1346,6 @@ class DictareEngine:
                     self.audio_manager.suspend_input()
                 except Exception:
                     logger.exception("Could not close strict-muted input")
-            try:
-                self.tts_mgr.stop_speaking()
-            except Exception:
-                logger.exception("Could not stop speech playback")
             self._notify_status()
 
     def resume_strict_mute(self) -> None:
@@ -1372,6 +1376,7 @@ class DictareEngine:
 
             resume_native_audio()
             resume_feedback()
+            self.tts_mgr.resume_after_strict()
             self._notify_status()
 
     def unmute(self) -> None:
