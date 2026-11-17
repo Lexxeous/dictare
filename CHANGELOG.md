@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Show profile/continuation options in agent help and explain nested service help.
 
+### Fixed
+- Treat a trailing resume as named-agent continuation; resolve and display the
+  selected Codex session instead of attempting to execute a resume binary.
+
 ### Development
 - Calculate release targets from pending change intent and current main tags;
   validate publishing from main and identify source runs with distinct dev labels.

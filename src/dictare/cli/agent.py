@@ -80,9 +80,8 @@ def register(app: typer.Typer) -> None:
 
         AGENT_ID is the session name (project, role, etc.) — not the model profile.
         Use --profile to pick which agent_profiles template to run. Without --profile,
-        default agent profile from config is used.
-
-        Use --continue to resume the named session.
+        the configured default profile is used. Use --continue to resume this
+        named session; a trailing `resume` is a shorthand for that option.
 
         Examples:
 
@@ -154,6 +153,13 @@ def register(app: typer.Typer) -> None:
                 break  # All remaining arguments belong to the child command.
 
         command_override = [arg for i, arg in enumerate(args) if i not in own_flags_to_remove]
+
+        # `resume` is a common shorthand for --continue. Keep command
+        # overrides explicit with `--`, so this typo-prone form does not try
+        # to launch a binary literally named "resume".
+        if not has_double_dash and command_override == ["resume"]:
+            command_override = []
+            continue_session = True
 
         # If there are leftover flag-like args (--foo) without an explicit '--' separator,
         # they are almost certainly mistyped dictare options — reject with a clear message.
@@ -264,18 +270,36 @@ def register(app: typer.Typer) -> None:
         )
         launch_binding: dict[str, str] = {}
 
-        # Apply --continue: exact adapter resume when bound, else the
-        # profile's plain continue_args (phase 1 behavior)
+        startup_message: str | None = None
+
+        # Apply --continue: use the named binding first. For Codex, an older
+        # unbound session can be recovered from its local rollout store before
+        # falling back to profile continue_args (usually `resume --last`).
         if continue_session:
+            resume_entry = registry_entry or {}
+            if adapter and not (resume_entry.get("session_id") or resume_entry.get("session_path")):
+                latest_binding = adapter.latest_binding(cwd)
+                if latest_binding:
+                    resume_entry = {**resume_entry, **latest_binding}
+                    launch_binding.update(latest_binding)
+
             exact_resume = (
-                adapter.resume_args(registry_entry)
-                if adapter and registry_entry
+                adapter.resume_args(resume_entry)
+                if adapter and resume_entry
                 else None
             )
             if exact_resume is not None:
                 command = [command[0]] + exact_resume + command[1:]
+                identity = resume_entry.get("session_id") or resume_entry.get("session_path")
+                if identity:
+                    startup_message = f"Resuming {type_key} session {identity}"
             elif resolved_profile is not None and resolved_profile.continue_args:
                 command = [command[0]] + resolved_profile.continue_args + command[1:]
+                if type_key == "codex":
+                    startup_message = (
+                        "Codex will choose its latest session using the configured "
+                        "resume arguments; Dictare could not identify a session ID."
+                    )
             elif resolved_profile is not None:
                 console.print("[yellow]Warning: --continue given but agent profile has no continue_args configured[/]")
             # With command override (--), --continue is silently ignored — user controls the full command
@@ -329,6 +353,7 @@ def register(app: typer.Typer) -> None:
             info_key=config.client.info_key,
             global_hotkey_key=config.hotkey.key,
             live_dangerously_args=applied_danger_args,
+            startup_message=startup_message,
         )
 
         # Post-exit discovery for adapters that cannot assign the session

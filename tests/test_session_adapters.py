@@ -146,6 +146,32 @@ class TestCodexAdapter:
         assert adapter.resume_args({"session_id": "u1"}) == ["resume", "u1"]
         assert adapter.resume_args({}) is None
 
+    def test_latest_binding_selects_newest_session_for_cwd(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        adapter = get_adapter("codex")
+        monkeypatch.setattr(type(adapter), "SESSIONS_ROOT", tmp_path)
+        now = time.time()
+        older = "019f1f48-47d6-7bc3-8217-adfcbdd68318"
+        newest = "029f1f48-47d6-7bc3-8217-adfcbdd68319"
+        _write_session_file(
+            tmp_path / "2026" / "11" / "16" / f"rollout-old-{older}.jsonl",
+            {"payload": {"session_id": older, "cwd": "/folder/a"}},
+            now + 1,
+        )
+        _write_session_file(
+            tmp_path / "2026" / "11" / "16" / f"rollout-new-{newest}.jsonl",
+            {"payload": {"session_id": newest, "cwd": "/folder/a"}},
+            now + 2,
+        )
+        _write_session_file(
+            tmp_path / "2026" / "11" / "16" / "rollout-other.jsonl",
+            {"payload": {"session_id": "other", "cwd": "/folder/b"}},
+            now + 3,
+        )
+
+        assert adapter.latest_binding("/folder/a") == {"session_id": newest}
+
     def test_new_session_has_no_extra_args(self) -> None:
         plan = get_adapter("codex").new_session("/f", "prova")
         assert plan.extra_args == [] and plan.binding == {}
