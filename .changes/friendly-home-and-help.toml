@@ -1,0 +1,3 @@
+name = "friendly-home-and-help"
+bump = "minor"
+summary = "Add a plain-language Home, listening controls, and bundled Markdown documentation."

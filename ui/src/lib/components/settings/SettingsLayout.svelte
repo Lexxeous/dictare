@@ -5,6 +5,7 @@
 	import EngineStatusBar from "./EngineStatusBar.svelte";
 	import EngineStopControl from "./EngineStopControl.svelte";
 	import DashboardPage from "$lib/components/dashboard/DashboardPage.svelte";
+	import HomePage from "$lib/components/home/HomePage.svelte";
 	import ModelsPage from "$lib/components/models/ModelsPage.svelte";
 	import { Button } from "$lib/components/ui/button";
 	import { RotateCcw, CheckCircle, XCircle } from "lucide-svelte";
@@ -179,12 +180,26 @@
 	});
 </script>
 
-<div class="flex h-screen">
+<div class="flex h-screen flex-col sm:flex-row">
 	<SettingsNav {tabs} bind:activeNavId version={schema?.version ?? ""} />
-	<main class="min-w-0 flex-1 overflow-y-auto" style="padding-bottom: {fixedBottomPx}px">
-		<div class="max-w-2xl mx-auto pt-14 pb-8">
+	<main class="min-w-0 min-h-0 flex-1 overflow-y-auto" style="padding-bottom: {fixedBottomPx}px">
+		<div class="max-w-2xl mx-auto pt-6 sm:pt-14 pb-8">
 			<EngineStopControl />
-			{#if activeNavId === "dashboard"}
+			{#if activeNavId === "home" || activeNavId === "documentation"}
+				<div class="px-4 mb-8">
+					<h2 class="text-xl font-semibold mb-1.5">{activeLabel}</h2>
+					<p class="text-sm text-muted-foreground">{activeDesc}</p>
+				</div>
+				{#if activeNavId === "home"}
+					<HomePage />
+				{:else}
+					{#await import("../home/DocumentationPage.svelte") then page}
+						<page.default />
+					{:catch}
+						<p role="alert" class="px-4">The guide could not be loaded. Reload this page to try again.</p>
+					{/await}
+				{/if}
+			{:else if activeNavId === "dashboard"}
 				<div class="px-4 mb-8">
 					<h2 class="text-xl font-semibold mb-1.5">{activeLabel}</h2>
 					<p class="text-sm text-muted-foreground">{activeDesc}</p>

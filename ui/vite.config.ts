@@ -10,9 +10,11 @@ export default defineConfig(({ mode }) => {
 		server: {
 			// Optional shared dependency directory for isolated Git worktrees.
 			// Keep Vite's strict boundary and do not expose the whole parent folder.
-			...(env.DICTARE_DEV_DEPENDENCIES ? {
-				fs: { allow: [searchForWorkspaceRoot('.'), env.DICTARE_DEV_DEPENDENCIES] }
-			} : {}),
+			fs: { allow: [
+				searchForWorkspaceRoot('.'),
+				'../README.md', // Vite runs from ui/, like loadEnv above.
+				...(env.DICTARE_DEV_DEPENDENCIES ? [env.DICTARE_DEV_DEPENDENCIES] : [])
+			] },
 			proxy: {
 				'/api': apiTarget,
 				'/openvip': apiTarget

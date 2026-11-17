@@ -1,0 +1,25 @@
+name: Settings UI
+
+on:
+  push:
+    branches: ["**"]
+    paths: ["ui/**", "README.md", ".github/workflows/ui.yml"]
+  pull_request:
+    branches: [develop, main]
+    paths: ["ui/**", "README.md", ".github/workflows/ui.yml"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npx --yes pnpm@10.34.9 install --frozen-lockfile
+      - run: npm test
+      - run: npx --no-install svelte-check --tsconfig ./tsconfig.json
+      - run: npm run build

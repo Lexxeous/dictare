@@ -230,6 +230,22 @@ page reports when the engine disconnects and explains how to start it again
 from the tray or usual launcher. Launch-at-login preferences are unchanged.
 A lost request connection is reported as unconfirmed rather than as success.
 
+## Home and Documentation
+
+Settings opens on **Home**, with Start listening / Stop listening controls,
+the current destination for your words, and voice-command and keyboard cheat
+sheets. Click the Dictare logo to return Home. On a narrow screen, use Menu
+to open navigation.
+
+**Documentation** displays the README included with your installed copy as
+rendered Markdown. Reading it does not require GitHub or an internet connection;
+external links open separately. Remote badges and images appear as descriptions
+to avoid loading external resources. Home keeps everyday guidance separate
+from the README's installation and developer reference.
+
+Stopping listening keeps Dictare running. **Stop Dictare** is the separate,
+confirmed action that closes the whole engine.
+
 ## Keyboard Mode
 
 No agent? Use dictare as a dictation tool — voice to keystrokes in any app.
