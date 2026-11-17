@@ -27,6 +27,8 @@ Open `http://127.0.0.1:5173/ui/` for local settings. Use
 `./scripts/dev.sh listen` and `./scripts/dev.sh pause` in another terminal for
 capture control. Global hotkey handling is disabled in this local runner;
 native launcher/hotkey changes need their own platform-specific check.
+Run setup again after pulling UI dependency changes; the source UI runner
+checks the installed lockfile before launching or building.
 
 On Apple Silicon, add `--extra mlx` if you need the MLX speech stack. UI work
 also requires pnpm dependencies in `ui/`.

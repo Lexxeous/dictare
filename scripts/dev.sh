@@ -50,6 +50,9 @@ require_ui_dependencies() {
     if [[ ! -d "$ROOT_DIR/ui/node_modules" ]]; then
         error "UI dependencies not found. Run ./scripts/dev.sh setup first."
     fi
+    if [[ ! -f "$ROOT_DIR/ui/node_modules/.pnpm/lock.yaml" ]] || ! cmp -s "$ROOT_DIR/ui/pnpm-lock.yaml" "$ROOT_DIR/ui/node_modules/.pnpm/lock.yaml"; then
+        error "UI dependencies are out of date. Run ./scripts/dev.sh setup after dependency changes."
+    fi
 }
 
 prepare_local_environment() {
