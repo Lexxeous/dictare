@@ -774,7 +774,10 @@ def set_config_values(updates: dict[str, str | None], config_path: Path | None =
     doc = tomlkit.parse(config_path.read_text(encoding="utf-8")) if config_path.exists() else tomlkit.document()
     for key, value in updates.items():
         parts = key.split(".")
-        nested_tuning = len(parts) == 3 and ".".join(parts[:2]) in {"audio.advanced", "stt.advanced"}
+        nested_tuning = len(parts) == 3 and ".".join(parts[:2]) in {
+            "audio.advanced", "stt.advanced",
+            "pipeline.mute_filter", "pipeline.submit_filter", "pipeline.agent_filter",
+        }
         nested_sound = len(parts) == 4 and parts[:2] == ["audio", "sounds"]
         if nested_tuning or nested_sound:
             current_group: Any = config_dict
@@ -792,6 +795,8 @@ def set_config_values(updates: dict[str, str | None], config_path: Path | None =
             if field not in current_group or field not in default_group:
                 raise KeyError(f"Unknown config key: {key}")
             current = current_group[field]
+            if isinstance(current, (dict, list)):
+                raise KeyError(f"Unknown config key: {key}")
             parsed = _parse_value(value, type(current) if current is not None else str) if value is not None else None
             current_group[field] = default_group[field] if value is None else parsed
             table: Any = doc

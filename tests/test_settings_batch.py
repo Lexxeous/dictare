@@ -147,3 +147,21 @@ def test_sound_invalid_volume_or_unknown_event_is_atomic(path):
     with pytest.raises(KeyError):
         set_config_values({'editor': 'new', 'audio.sounds.imaginary.enabled': 'true'}, path)
     assert path.read_bytes() == original
+
+
+def test_pipeline_scalar_settings_preserve_patterns(path):
+    path.write_text('[pipeline.mute_filter]\nenabled = true # keep\nmute_triggers = { "*" = [["hello", "mute"]] }\n')
+    set_config_values({'pipeline.mute_filter.enabled': 'false', 'pipeline.agent_filter.match_threshold': '0.7'}, path)
+    assert not load_config(path).pipeline.mute_filter.enabled
+    assert load_config(path).pipeline.agent_filter.match_threshold == 0.7
+    assert 'mute_triggers = { "*" = [["hello", "mute"]] }' in path.read_text()
+    assert '# keep' in path.read_text()
+    set_config_values({'pipeline.mute_filter.enabled': None}, path)
+    assert load_config(path).pipeline.mute_filter.enabled
+
+
+def test_pipeline_complex_settings_cannot_be_replaced_by_scalar_form(path):
+    original = path.read_bytes()
+    with pytest.raises(KeyError):
+        set_config_values({'pipeline.mute_filter.mute_triggers': 'bad'}, path)
+    assert path.read_bytes() == original

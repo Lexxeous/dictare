@@ -147,7 +147,7 @@
 	</div>
 {:else if field.key === "audio.sounds"}
 	<SoundSettings {schema} defaults={field.default} />
-{:else if field.key === "audio.advanced" || field.key === "stt.advanced"}
+{:else if field.key === "audio.advanced" || field.key === "stt.advanced" || field.key === "pipeline.mute_filter" || field.key === "pipeline.submit_filter" || field.key === "pipeline.agent_filter"}
 	<NestedSettings section={field.key} {schema} />
 {:else if isTomlEditable}
 	<!-- Full-width TOML editor — no inline label/control split -->

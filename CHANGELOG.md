@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Add form controls for sound feedback, audio tuning and speech recognition
-  tuning, with optional advanced configuration editors.
+- Add form controls for sound feedback, audio tuning, speech recognition and
+  pipeline filters, with optional advanced configuration editors.
 - Add a separate strict mute that closes microphone input and audio until the
   hotkey resumes, while standard mute retains spoken resume.
 - Optionally pause after each prompt for review, with an explicit Send or

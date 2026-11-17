@@ -4,10 +4,27 @@
 	import FieldRenderer from "../FieldRenderer.svelte";
 	import TomlField from "./TomlField.svelte";
 
-	interface Props { section: "audio.advanced" | "stt.advanced"; schema: JsonSchema }
+	type Group = "audio.advanced" | "stt.advanced" | "pipeline.mute_filter" | "pipeline.submit_filter" | "pipeline.agent_filter";
+	interface Props { section: Group; schema: JsonSchema }
 	let { section, schema }: Props = $props();
 
 	const groups: Record<Props["section"], Array<[string, string, string]>> = {
+		"pipeline.mute_filter": [
+			["enabled", "bool", "Recognize spoken mute and resume commands."],
+			["confidence_threshold", "float", "Minimum confidence for matching a command."],
+			["max_scan_words", "int", "Maximum recent words checked for a command."],
+			["decay_rate", "float", "How quickly confidence decreases for earlier words."],
+		],
+		"pipeline.submit_filter": [
+			["enabled", "bool", "Recognize spoken send commands."],
+			["confidence_threshold", "float", "Minimum confidence for matching a command."],
+			["max_scan_words", "int", "Maximum recent words checked for a command."],
+			["decay_rate", "float", "How quickly confidence decreases for earlier words."],
+		],
+		"pipeline.agent_filter": [
+			["enabled", "bool", "Allow switching assistants by voice."],
+			["match_threshold", "float", "Minimum similarity for matching an assistant name."],
+		],
 		"audio.advanced": [
 			["sample_rate", "int", "Audio sample rate in hertz."],
 			["channels", "int", "Number of input audio channels."],
@@ -24,6 +41,11 @@
 			["max_repetitions", "int", "Maximum repeated words before filtering."],
 		],
 	};
+	const titles: Record<Group, string> = {
+		"audio.advanced": "Audio tuning", "stt.advanced": "Recognition tuning",
+		"pipeline.mute_filter": "Mute and resume", "pipeline.submit_filter": "Send commands",
+		"pipeline.agent_filter": "Switch assistants",
+	};
 	const fields = $derived(groups[section].map(([name, type, description]): FieldMeta => {
 		const key = `${section}.${name}`;
 		return { key, type, description, default: resolveFieldSchema(key, schema)?.default, env_var: "" };
@@ -31,7 +53,7 @@
 </script>
 
 <div class="mb-6">
-	<h3 class="px-4 py-2 text-sm font-medium">{section === "audio.advanced" ? "Audio tuning" : "Recognition tuning"}</h3>
+	<h3 class="px-4 py-2 text-sm font-medium">{titles[section]}</h3>
 	{#each fields as field (field.key)}
 		<FieldRenderer {field} {schema} nestedForm />
 	{/each}
