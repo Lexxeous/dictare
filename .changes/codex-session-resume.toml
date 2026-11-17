@@ -1,0 +1,3 @@
+name = "codex-session-resume"
+bump = "patch"
+summary = "Handle the resume alias and show the selected Codex session at startup."
