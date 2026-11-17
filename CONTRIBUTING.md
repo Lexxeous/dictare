@@ -34,6 +34,9 @@ An isolated worktree can reuse a compatible contributor environment by setting
 `DICTARE_DEV_PYTHON` to that checkout's `.venv/bin/python`. The helper still
 imports the selected worktree's source and uses its separate `.dictare-dev/`
 state and explicit ports; it never invokes the installed `dictare` command.
+The source serve/stack runners honor Dictare's restart exit code after settings
+changes. Normal shutdown exits; Ctrl+C stops only their owned engine/UI process
+groups, including child processes, without managing the installed service.
 
 On Apple Silicon, add `--extra mlx` if you need the MLX speech stack. UI work
 also requires pnpm dependencies in `ui/`.

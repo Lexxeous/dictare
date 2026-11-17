@@ -97,14 +97,14 @@ run_cli() {
 run_serve() {
     require_python
     prepare_local_environment
-    exec "$VENV_PYTHON" -m dictare serve --config "$DEV_CONFIG" "$@"
+    exec "$VENV_PYTHON" "$ROOT_DIR/scripts/dev_process.py" --restart-on 75 -- "$VENV_PYTHON" -m dictare serve --config "$DEV_CONFIG" "$@"
 }
 
 run_ui() {
     require_ui_dependencies
     prepare_local_environment
     cd "$ROOT_DIR/ui"
-    exec npm run dev -- --host 127.0.0.1 --port "$UI_PORT" --strictPort "$@"
+    exec "$VENV_PYTHON" "$ROOT_DIR/scripts/dev_process.py" -- npm run dev -- --host 127.0.0.1 --port "$UI_PORT" --strictPort "$@"
 }
 
 run_stack() {
@@ -113,11 +113,11 @@ run_stack() {
     prepare_local_environment
 
     local engine_pid ui_pid status
-    "$VENV_PYTHON" -m dictare serve --config "$DEV_CONFIG" --verbose &
+    "$VENV_PYTHON" "$ROOT_DIR/scripts/dev_process.py" --restart-on 75 -- "$VENV_PYTHON" -m dictare serve --config "$DEV_CONFIG" --verbose &
     engine_pid=$!
     (
         cd "$ROOT_DIR/ui"
-        exec npm run dev -- --host 127.0.0.1 --port "$UI_PORT" --strictPort
+        exec "$VENV_PYTHON" "$ROOT_DIR/scripts/dev_process.py" -- npm run dev -- --host 127.0.0.1 --port "$UI_PORT" --strictPort
     ) &
     ui_pid=$!
 
@@ -227,7 +227,7 @@ case "$command_name" in
     lint)
         require_python
         cd "$ROOT_DIR"
-        exec "$VENV_PYTHON" -m ruff check src/ tests/ "$@"
+        exec "$VENV_PYTHON" -m ruff check src/ tests/ scripts/release_plan.py scripts/dev_process.py "$@"
         ;;
     typecheck)
         require_python
