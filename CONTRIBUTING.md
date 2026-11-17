@@ -38,6 +38,11 @@ Keep local checkouts under the ignored `.worktrees/<name>/` directory inside
 this repository. Checkout-specific helpers and logs belong in that checkout's
 `.dictare-dev/checks/` and `.dictare-dev/logs/`, respectively. Keep the container
 free of loose scripts and logs; use `git worktree move` when relocating.
+If the development engine port is already in use, stop the earlier checkout
+process with `./scripts/dev.sh stop` before starting the stack again. This
+command verifies the target is this checkout's source engine and waits for its
+port to close; it does not stop the installed service. For older source runs
+without the development identity endpoint, stop their original terminal.
 Use `./scripts/dev.sh hotkey` to simulate one hotkey tap in the source engine
 when testing shortcut-dependent behavior. This is a loopback-only development
 route; it does not register a global shortcut or control the installed engine.

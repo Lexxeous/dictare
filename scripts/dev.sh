@@ -22,6 +22,7 @@ Usage: ./scripts/dev.sh
   stack               Run the local engine and UI together
   listen              Start listening on the local engine
   pause               Stop listening on the local engine
+  stop                Stop the verified local source engine
   hotkey              Simulate one source hotkey tap (no global shortcut)
   test [PYTEST_ARGS…] Run the repository tests
   lint                Run Ruff on source and tests
@@ -67,6 +68,7 @@ prepare_local_environment() {
     fi
 
     export DICTARE_DEV_MODE=1
+    export DICTARE_DEV_CHECKOUT="$ROOT_DIR"
     require_python
     export DICTARE_DEV_VERSION
     DICTARE_DEV_VERSION="$(cd "$ROOT_DIR" && "$VENV_PYTHON" scripts/release_plan.py --local-version)"
@@ -112,6 +114,9 @@ run_stack() {
     require_python
     require_ui_dependencies
     prepare_local_environment
+    if "$VENV_PYTHON" "$ROOT_DIR/scripts/dev_control.py" "$API_URL" probe; then
+        error "Port $API_PORT is already in use. If a source engine is running, use ./scripts/dev.sh stop or stop its terminal. Otherwise choose another DICTARE_DEV_API_PORT."
+    fi
 
     local engine_pid ui_pid status
     "$VENV_PYTHON" "$ROOT_DIR/scripts/dev_process.py" --restart-on 75 -- "$VENV_PYTHON" -m dictare serve --config "$DEV_CONFIG" --verbose &
@@ -153,24 +158,7 @@ run_stack() {
 set_local_listening() {
     require_python
     prepare_local_environment
-    "$VENV_PYTHON" - "$API_URL" "$1" <<'PY'
-import json
-import sys
-from urllib.error import URLError
-from urllib.request import Request, urlopen
-
-is_hotkey = sys.argv[2] == "dev.hotkey"
-request = Request(
-    sys.argv[1] + ("/api/dev/hotkey" if is_hotkey else "/openvip/control"),
-    data=json.dumps({} if is_hotkey else {"command": sys.argv[2]}).encode(),
-    headers={"Content-Type": "application/json"},
-)
-try:
-    with urlopen(request, timeout=5) as response:
-        print(response.read().decode())
-except URLError as error:
-    raise SystemExit(f"Cannot reach the local source engine. Start ./scripts/dev.sh stack: {error}")
-PY
+    "$VENV_PYTHON" "$ROOT_DIR/scripts/dev_control.py" "$API_URL" "$1"
 }
 
 command_name="${1:-help}"
@@ -212,6 +200,10 @@ case "$command_name" in
         [[ $# -eq 0 ]] || error "The stack command does not accept extra arguments. Set DICTARE_DEV_API_PORT or DICTARE_DEV_UI_PORT to change ports."
         run_stack
         ;;
+    stop)
+        [[ $# -eq 0 ]] || error "The stop command does not accept arguments."
+        set_local_listening engine.shutdown
+        ;;
     hotkey)
         [[ $# -eq 0 ]] || error "The hotkey command does not accept arguments."
         set_local_listening dev.hotkey
@@ -233,7 +225,7 @@ case "$command_name" in
     lint)
         require_python
         cd "$ROOT_DIR"
-        exec "$VENV_PYTHON" -m ruff check src/ tests/ scripts/release_plan.py scripts/dev_process.py "$@"
+        exec "$VENV_PYTHON" -m ruff check src/ tests/ scripts/release_plan.py scripts/dev_process.py scripts/dev_control.py "$@"
         ;;
     typecheck)
         require_python

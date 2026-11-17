@@ -66,6 +66,7 @@ boundaries. Keep those documents aligned with the implementation.
 Apple Silicon speech extra. `./scripts/dev.sh stack` runs the local engine and
 UI with ignored `.dictare-dev/` state and alternate ports. Use `listen` and
 `pause` for capture control; global hotkeys are disabled in source mode.
+`./scripts/dev.sh stop` stops only the verified source engine from this checkout;
 `./scripts/dev.sh hotkey` simulates one local source hotkey tap without a
 global shortcut. `test`, `lint`, and `typecheck` use the same checkout-local
 Python environment.
