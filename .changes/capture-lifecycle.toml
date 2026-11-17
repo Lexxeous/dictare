@@ -1,0 +1,3 @@
+name = "capture-lifecycle"
+bump = "patch"
+summary = "Reject canceled capture work after discard and completed stop boundaries."

@@ -50,6 +50,20 @@ communicating with the Python engine via Unix socket IPC.
 
 ## STT Engines
 
+Capture lifetime is separate from recognition-worker recovery. VAD events,
+queued recognition jobs, completions and timeout events carry a capture
+generation. Discard and completed Stop boundaries invalidate that generation,
+clear pending capture/deferred submit, and reject old work before state changes,
+transcript statistics/logging, pipeline control actions or delivery. A native
+recognizer already executing may finish; its canceled result is ignored.
+
+The controller owns state/watchdog cancellation. The engine's reentrant delivery
+lock serializes cancellation with pipeline execution and sending. Reset VAD
+under its existing owner lock before advancing the generation, so callbacks
+already running retain their old identity. VAD callbacks must not acquire the
+delivery lock while holding the VAD lock. Preserve queue shutdown sentinels.
+This capture contract does not itself implement strict mute or cancel TTS.
+
 | Config | Engine | Runtime | Hardware |
 |--------|--------|---------|----------|
 | `tiny`…`large-v3-turbo` | FasterWhisperEngine | CTranslate2 | Linux / Intel Mac |

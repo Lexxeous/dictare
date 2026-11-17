@@ -214,7 +214,7 @@ class StateMessage:
 class SpeechStarted(StateMessage):
     """VAD detected speech start."""
 
-    pass
+    capture_generation: int | None = None
 
 @dataclass(frozen=True)
 class SpeechEnded(StateMessage):
@@ -226,6 +226,7 @@ class SpeechEnded(StateMessage):
 
     audio_data: Any = None
     agent: Any = None  # Captured at creation time
+    capture_generation: int | None = None
 
 @dataclass(frozen=True)
 class TranscriptionCompleted(StateMessage):
@@ -234,6 +235,7 @@ class TranscriptionCompleted(StateMessage):
     text: str = ""
     agent: Any = None  # The agent to use for injection
     language: str | None = None  # Detected language from STT
+    capture_generation: int | None = None
 
 @dataclass(frozen=True)
 class PlayStarted(StateMessage):
