@@ -10,10 +10,12 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from dictare.utils.paths import get_data_dir as get_dictare_data_dir
+
 
 def get_data_dir() -> Path:
     """Get the dictare data directory."""
-    data_dir = Path.home() / ".local" / "share" / "dictare"
+    data_dir = get_dictare_data_dir()
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
 

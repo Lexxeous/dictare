@@ -15,6 +15,19 @@ uv sync --python 3.11 --extra dev
 uv run --python 3.11 dictare --help
 ```
 
+For a checkout-local environment that stays separate from an installed
+Homebrew version, use `./scripts/dev.sh setup`, then
+`./scripts/dev.sh run --help` or `./scripts/dev.sh stack`. The local runner
+uses `.venv` and stores its copied config, PID, logs, stats, and session data
+under the ignored `.dictare-dev/` directory. It uses engine port 18770 and UI
+port 5173; it does not run service lifecycle commands. See
+`./scripts/dev.sh --help` for the full command list.
+
+Open `http://127.0.0.1:5173/ui/` for local settings. Use
+`./scripts/dev.sh listen` and `./scripts/dev.sh pause` in another terminal for
+capture control. Global hotkey handling is disabled in this local runner;
+native launcher/hotkey changes need their own platform-specific check.
+
 On Apple Silicon, add `--extra mlx` if you need the MLX speech stack. UI work
 also requires pnpm dependencies in `ui/`.
 

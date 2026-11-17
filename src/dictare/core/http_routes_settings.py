@@ -65,7 +65,9 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
                 "active_provider": runtime.get("active_provider", "none"),
                 "capture_healthy": runtime.get("capture_healthy", False),
             }
-        status_file = Path.home() / ".dictare" / "hotkey_status"
+        from dictare.utils.paths import get_dictare_dir
+
+        status_file = get_dictare_dir() / "hotkey_status"
         status = status_file.read_text().strip() if status_file.exists() else "unknown"
         return {"status": status}
 

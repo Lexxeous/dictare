@@ -12,9 +12,11 @@ import logging
 import os
 from pathlib import Path
 
+from dictare.utils.paths import get_data_dir
+
 logger = logging.getLogger(__name__)
 
-_CACHE_DIR = Path.home() / ".local" / "share" / "dictare" / "tts-cache"
+_CACHE_DIR = get_data_dir() / "tts-cache"
 _MAX_CACHED = 1000
 
 def cache_key(engine: str, text: str, language: str, voice: str) -> str:

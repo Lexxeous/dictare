@@ -552,11 +552,17 @@ class Config(BaseModel):
 
 def get_config_dir() -> Path:
     """Get the configuration directory path."""
+    config_path = os.environ.get("DICTARE_CONFIG_PATH")
+    if config_path:
+        return Path(config_path).expanduser().parent
     config_dir = Path.home() / ".config" / "dictare"
     return config_dir
 
 def get_config_path() -> Path:
     """Get the configuration file path."""
+    config_path = os.environ.get("DICTARE_CONFIG_PATH")
+    if config_path:
+        return Path(config_path).expanduser()
     return get_config_dir() / "config.toml"
 
 def _key_to_env_var(key: str) -> str:

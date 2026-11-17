@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Literal
 
 from dictare.hotkey.runtime_status import read_runtime_status
@@ -13,6 +12,7 @@ from dictare.platform.permissions import (
     open_input_monitoring_settings,
     open_microphone_settings,
 )
+from dictare.utils.paths import get_dictare_dir
 
 
 @dataclass
@@ -178,7 +178,7 @@ class PermissionDoctor:
 
     @staticmethod
     def _read_launcher_status() -> str:
-        status_file = Path.home() / ".dictare" / "hotkey_status"
+        status_file = get_dictare_dir() / "hotkey_status"
         try:
             return status_file.read_text().strip()
         except FileNotFoundError:

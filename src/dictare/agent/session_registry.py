@@ -18,9 +18,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from dictare.utils.paths import get_dictare_dir
+
 logger = logging.getLogger(__name__)
 
-REGISTRY_DIR = Path.home() / ".dictare" / "projects"
+REGISTRY_DIR = get_dictare_dir() / "projects"
 
 
 def _encode_cwd(cwd: str) -> str:

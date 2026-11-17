@@ -106,13 +106,15 @@ def _run_serve(
     from dictare import __version__
     from dictare.logging.setup import get_default_log_path, setup_logging
 
-    # Self-healing: ensure python_path matches the running Python.
-    # After brew upgrade, the Cellar path changes — this auto-corrects it.
-    try:
-        from dictare.daemon.app_bundle import ensure_python_path
-        ensure_python_path(sys.executable)
-    except Exception:
-        pass  # Non-fatal — service still starts, just python_path may be stale
+    # The installed launcher keeps a pointer to its managed runtime. A local
+    # source run must never repoint that launcher at the development venv.
+    if not os.environ.get("DICTARE_DEV_MODE"):
+        try:
+            from dictare.daemon.app_bundle import ensure_python_path
+
+            ensure_python_path(sys.executable)
+        except Exception:
+            pass  # Non-fatal — service still starts, just python_path may be stale
 
     # Timestamp all stderr output (catches crashes before logging is ready)
     _original_stderr = sys.stderr

@@ -260,7 +260,9 @@ class AppController:
         #   so disable engine's pynput listener to avoid double toggle.
         # Linux serve mode: no Swift launcher — engine must listen for hotkey
         #   directly via evdev.
-        enable_hotkey = with_bindings or sys.platform != "darwin"
+        enable_hotkey = (with_bindings or sys.platform != "darwin") and not os.environ.get(
+            "DICTARE_DEV_MODE"
+        )
         logger.info(
             "AppController.start: config.output.mode=%r, with_bindings=%r, "
             "enable_hotkey=%r, platform=%r, start_listening=%r",

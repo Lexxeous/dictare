@@ -85,9 +85,9 @@ def main(argv: list[str] | None = None) -> None:
     if not token:
         parser.error("DICTARE_TTS_TOKEN is required")
 
-    from pathlib import Path
+    from dictare.utils.paths import get_data_dir
 
-    log_dir = Path.home() / ".local" / "share" / "dictare" / "logs"
+    log_dir = get_data_dir() / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "tts-worker.log"
 

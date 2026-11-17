@@ -18,10 +18,11 @@ from pathlib import Path
 from typing import Any
 
 from dictare.hotkey.runtime_status import clear_runtime_status, write_runtime_status
+from dictare.utils.paths import get_dictare_dir
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SOCKET_PATH = Path.home() / ".dictare" / "hotkey.sock"
+DEFAULT_SOCKET_PATH = get_dictare_dir() / "hotkey.sock"
 
 class HotkeyIPCServer:
     """Receive hotkey events over a Unix socket and reply with ACK.
@@ -254,7 +255,7 @@ class HotkeyIPCServer:
             if not launcher.exists():
                 return
             h = hashlib.sha256(launcher.read_bytes()).hexdigest()
-            confirmed_file = Path.home() / ".dictare" / "hotkey_confirmed_hash"
+            confirmed_file = get_dictare_dir() / "hotkey_confirmed_hash"
             confirmed_file.write_text(h, encoding="utf-8")
             logger.debug("Saved confirmed launcher hash: %s", h[:12])
         except Exception:
@@ -262,7 +263,7 @@ class HotkeyIPCServer:
 
     @staticmethod
     def _read_launcher_status() -> str:
-        status_file = Path.home() / ".dictare" / "hotkey_status"
+        status_file = get_dictare_dir() / "hotkey_status"
         try:
             return status_file.read_text().strip()
         except FileNotFoundError:
@@ -278,7 +279,7 @@ def check_confirmed_launcher_hash() -> bool:
         from dictare.daemon.app_bundle import get_app_path
 
         launcher = get_app_path() / "Contents" / "MacOS" / "Dictare"
-        confirmed_file = Path.home() / ".dictare" / "hotkey_confirmed_hash"
+        confirmed_file = get_dictare_dir() / "hotkey_confirmed_hash"
         if not launcher.exists() or not confirmed_file.exists():
             return False
         current = hashlib.sha256(launcher.read_bytes()).hexdigest()

@@ -6,9 +6,11 @@ import json
 from pathlib import Path
 from typing import Any
 
+from dictare.utils.paths import get_dictare_dir
+
 
 def get_runtime_status_path() -> Path:
-    return Path.home() / ".dictare" / "hotkey_runtime_status"
+    return get_dictare_dir() / "hotkey_runtime_status"
 
 def read_runtime_status() -> dict[str, Any] | None:
     path = get_runtime_status_path()

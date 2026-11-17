@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from dictare.utils.stats import (
     get_model_load_time,
+    get_stats_path,
     load_stats,
     save_model_load_time,
     save_stats,
@@ -29,6 +30,12 @@ def _empty_stats():
         "total_time_saved_seconds": 0.0,
         "sessions": 0,
     }
+
+
+def test_data_dir_environment_override(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DICTARE_DATA_DIR", str(tmp_path))
+
+    assert get_stats_path() == tmp_path / "stats.json"
 
 # ---------------------------------------------------------------------------
 # load_stats / save_stats round-trip

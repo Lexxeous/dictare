@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TypedDict
 
+from dictare.utils.paths import get_data_dir
+
 
 class StatsData(TypedDict, total=False):
     """Structure for persistent stats.
@@ -31,8 +33,7 @@ class StatsData(TypedDict, total=False):
 
 def get_stats_path() -> Path:
     """Get path to stats file (~/.local/share/dictare/stats.json)."""
-    data_dir = Path.home() / ".local" / "share" / "dictare"
-    return data_dir / "stats.json"
+    return get_data_dir() / "stats.json"
 
 def load_stats() -> StatsData:
     """Load persistent stats from disk.

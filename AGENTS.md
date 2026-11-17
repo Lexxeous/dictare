@@ -45,6 +45,12 @@ boundaries. Keep those documents aligned with the implementation.
 
 ## Development Checks
 
+`./scripts/dev.sh setup` installs the local environment; add `--mlx` for the
+Apple Silicon speech extra. `./scripts/dev.sh stack` runs the local engine and
+UI with ignored `.dictare-dev/` state and alternate ports. Use `listen` and
+`pause` for capture control; global hotkeys are disabled in source mode.
+`test`, `lint`, and `typecheck` use the same checkout-local Python environment.
+
 Use the repository's Python 3.11 environment:
 
 ```bash

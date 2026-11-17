@@ -19,6 +19,8 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+from dictare.utils.paths import get_data_dir
+
 logger = logging.getLogger(__name__)
 
 # Engines that need an isolated venv. Maps engine name → pip packages.
@@ -35,7 +37,7 @@ VENV_ENGINES: dict[str, list[str]] = {
 _SHARED_DEPS = ["pydantic", "urllib3", "python-dateutil", "typing-extensions"]
 
 # Root directory for TTS venvs
-_VENV_ROOT = Path.home() / ".local" / "share" / "dictare" / "tts-env"
+_VENV_ROOT = get_data_dir() / "tts-env"
 
 def get_venv_dir(engine: str) -> Path:
     """Return the venv directory for a TTS engine.

@@ -30,12 +30,13 @@ from dictare.agent.pty_session import (
 from dictare.logging.setup import setup_logging
 from dictare.pipeline.base import PipelineAction
 from dictare.pipeline.executors import InputExecutor
+from dictare.utils.paths import get_data_dir
 from dictare.utils.stats import update_keystrokes
 
 logger = logging.getLogger(__name__)
 
 # Session logs directory
-SESSIONS_DIR = Path.home() / ".local" / "share" / "dictare" / "sessions"
+SESSIONS_DIR = get_data_dir() / "sessions"
 
 # Default engine HTTP server URL (also configurable via [client] in config.toml)
 DEFAULT_BASE_URL = "http://127.0.0.1:8770/openvip"
@@ -1042,7 +1043,7 @@ def run_agent(
 
     # Set up agent log file (standard logging)
     _agent_log_handler = setup_logging(
-        log_path=Path.home() / ".local" / "share" / "dictare" / "logs" / f"agent.{agent_id}.jsonl",
+        log_path=get_data_dir() / "logs" / f"agent.{agent_id}.jsonl",
         level=logging.DEBUG if verbose else logging.INFO,
         version=__version__,
         source=f"agent.{agent_id}",
