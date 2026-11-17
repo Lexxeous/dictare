@@ -49,7 +49,7 @@ def build_status(engine: DictareEngine) -> dict:
     stt_state = state_map.get(engine.state, "off")
 
     # Voice muted overrides the displayed state
-    if engine._voice_muted and stt_state == "listening":
+    if engine._voice_muted and stt_state in {"listening", "recording", "transcribing"}:
         stt_state = "muted"
 
     uptime = (

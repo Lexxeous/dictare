@@ -39,3 +39,21 @@ def test_agent_announcement_is_silent_only_while_muted():
     engine._voice_muted = False
     events.on_agent_change("codex", 0)
     engine.speak_agent.assert_called_once_with("codex")
+
+
+def test_standard_mute_status_stays_muted_during_background_speech(monkeypatch):
+    import dictare.core.status_report as status_report
+
+    monkeypatch.setattr(status_report, "audio_devices", lambda: {})
+    monkeypatch.setattr(status_report, "permissions", lambda: {})
+    monkeypatch.setattr(status_report, "hotkey_active", lambda engine: False)
+    monkeypatch.setattr(status_report, "hotkey_status_raw", lambda engine: "unknown")
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine._voice_muted = True
+    for state in (AppState.LISTENING, AppState.RECORDING, AppState.TRANSCRIBING):
+        engine._state_manager.transition(state, force=True)
+        status = engine.get_status()
+        assert status["platform"]["state"] == "muted"
+        assert status["stt"]["active"] is True  # Voice resume still needs recognition.
+    engine._state_manager.transition(AppState.OFF, force=True)
+    assert engine.get_status()["platform"]["state"] == "off"
