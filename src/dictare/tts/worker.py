@@ -71,6 +71,22 @@ def _post_completion(
     except Exception:
         logger.warning("Failed to post TTS completion for %s", message_id, exc_info=True)
 
+def _playback_permitted(url: str, token: str, message_id: str) -> bool:
+    """Ask the owning engine if this worker request is still authorized."""
+    from urllib.parse import quote
+
+    req = urllib.request.Request(
+        f"{url}/internal/tts/permit/{quote(message_id, safe='')}",
+        headers={"Authorization": f"Bearer {token}", "Cache-Control": "no-store"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=2) as response:
+            return json.loads(response.read()).get("allowed") is True
+    except Exception:
+        logger.warning("TTS playback permission unavailable for %s", message_id)
+        return False
+
+
 def main(argv: list[str] | None = None) -> None:
     """Entry point for the TTS worker subprocess."""
     parser = argparse.ArgumentParser(description="Dictare TTS worker")
@@ -168,7 +184,7 @@ def main(argv: list[str] | None = None) -> None:
 
     import threading
 
-    from dictare.tts.base import play_audio_native
+    from dictare.tts.base import native_playback_permit, play_audio_native
 
     def _play_cached_thread(
         path: str, message_id: str, url: str, token: str,
@@ -177,7 +193,8 @@ def main(argv: list[str] | None = None) -> None:
         start_t = time.time()
         ok = True
         try:
-            play_audio_native(path, timeout=120.0)
+            with native_playback_permit(lambda: _playback_permitted(url, token, message_id)):
+                ok = play_audio_native(path, timeout=120.0)
         except Exception:
             logger.warning("Cached play failed: %s", path, exc_info=True)
             ok = False
@@ -200,6 +217,10 @@ def main(argv: list[str] | None = None) -> None:
         voice = msg.voice
         language = msg.language
         logger.info("Speaking: chars=%d (id=%s, voice=%s, lang=%s)", len(text), message_id, voice, language)
+        if not _playback_permitted(args.url, token, message_id):
+            if message_id:
+                _post_completion(args.url, token, message_id, False, 0)
+            continue
 
         # Fast-path: cached audio → play on background thread (non-blocking)
         cached_path = tts_engine.check_cache(text, voice=voice, language=language)
@@ -217,7 +238,9 @@ def main(argv: list[str] | None = None) -> None:
         _stop_requested = False
         start = time.time()
         try:
-            ok = tts_engine.speak(text, voice=voice, language=language)
+            with native_playback_permit(lambda: _playback_permitted(args.url, token, message_id)):
+                ok = tts_engine.speak(text, voice=voice, language=language)
+            ok = ok and _playback_permitted(args.url, token, message_id)
         except Exception:
             logger.warning("TTS speak failed (id=%s)", message_id, exc_info=True)
             ok = False

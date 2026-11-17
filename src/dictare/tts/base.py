@@ -9,7 +9,7 @@ import subprocess
 import sys
 import threading
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -23,6 +23,9 @@ _audio_generation = 0
 _audio_suspended = False
 _audio_scope: contextvars.ContextVar[int | None] = contextvars.ContextVar(
     "dictare_tts_audio_generation", default=None,
+)
+_audio_permit: contextvars.ContextVar[Callable[[], bool] | None] = contextvars.ContextVar(
+    "dictare_tts_audio_permit", default=None,
 )
 
 
@@ -39,6 +42,26 @@ def native_audio_scope(generation: int) -> Iterator[None]:
         yield
     finally:
         _audio_scope.reset(token)
+
+
+@contextmanager
+def native_playback_permit(check: Callable[[], bool]) -> Iterator[None]:
+    """Bind worker playback to a revocable, fail-closed permit."""
+    token = _audio_permit.set(check)
+    try:
+        yield
+    finally:
+        _audio_permit.reset(token)
+
+
+def _native_permitted() -> bool:
+    check = _audio_permit.get()
+    if check is None:
+        return True
+    try:
+        return check() is True
+    except Exception:
+        return False
 
 
 def stop_audio_native() -> bool:
@@ -84,11 +107,16 @@ def play_audio_native(path: str | Path, *, timeout: float = 120.0, volume: float
 
     with _audio_lock:
         generation = _audio_scope.get()
-        if _audio_suspended or (generation is not None and generation != _audio_generation):
+        if (_audio_suspended or (generation is not None and generation != _audio_generation)
+                or not _native_permitted()):
             return False
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         _audio_processes.add(proc)
     try:
+        if not _native_permitted():
+            proc.terminate()
+            proc.wait(timeout=timeout)
+            return False
         proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
         proc.terminate()

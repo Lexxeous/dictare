@@ -49,3 +49,20 @@ def test_permit_endpoint_requires_worker_token_and_pending_request():
     assert response.headers["cache-control"] == "no-store"
     proxy.suspend_requests()
     assert client.get("/internal/tts/permit/id", headers=auth).json() == {"allowed": False}
+
+
+def test_worker_checks_token_and_fails_closed(monkeypatch):
+    import json
+    from unittest.mock import patch
+
+    from dictare.tts.worker import _playback_permitted
+
+    response = MagicMock()
+    response.__enter__.return_value.read.return_value = json.dumps({"allowed": True}).encode()
+    with patch("urllib.request.urlopen", return_value=response) as send:
+        assert _playback_permitted("http://localhost:8770", "secret", "request/id")
+        request = send.call_args.args[0]
+        assert request.get_header("Authorization") == "Bearer secret"
+        assert request.full_url.endswith("/request%2Fid")
+    with patch("urllib.request.urlopen", side_effect=OSError("offline")):
+        assert not _playback_permitted("http://localhost:8770", "secret", "id")

@@ -55,3 +55,17 @@ def test_old_synthesis_generation_remains_invalid_after_resume(monkeypatch):
     with base.native_audio_scope(base.native_audio_generation()):
         assert base.play_audio_native("fresh.wav")
     popen.assert_called_once()
+
+
+def test_revoked_worker_permit_blocks_player_before_and_after_spawn(monkeypatch):
+    monkeypatch.setattr(base.sys, "platform", "darwin")
+    process = MagicMock()
+    popen = MagicMock(return_value=process)
+    monkeypatch.setattr(base.subprocess, "Popen", popen)
+    with base.native_playback_permit(lambda: False):
+        assert not base.play_audio_native("blocked.wav")
+    popen.assert_not_called()
+    permits = iter([True, False])
+    with base.native_playback_permit(lambda: next(permits)):
+        assert not base.play_audio_native("revoked.wav")
+    process.terminate.assert_called_once()
