@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any
 from dictare.core.fsm import (
     AppState,
     DiscardCurrent,
+    HoldCaptureEnded,
     HotkeyPressed,
     PlayCompleted,
     PlayStarted,
@@ -158,7 +159,7 @@ class StateController:
 
     def _handle_event(self, event: StateMessage) -> None:
         """Handle a single event. Called sequentially, never concurrently."""
-        if isinstance(event, (SpeechStarted, SpeechEnded, TranscriptionCompleted)):
+        if isinstance(event, (SpeechStarted, SpeechEnded, TranscriptionCompleted, HoldCaptureEnded)):
             if self._engine and not self._engine.capture_allowed(event.capture_generation):
                 return
         if isinstance(event, SpeechStarted):
@@ -177,6 +178,8 @@ class StateController:
             self._handle_agent_switch(event)
         elif isinstance(event, SetListening):
             self._handle_set_listening(event)
+        elif isinstance(event, HoldCaptureEnded):
+            self._handle_hold_ended(event)
         elif isinstance(event, StrictMuted):
             self._cancel_transcription_watchdog()
             self._pending_transcription = None
@@ -484,6 +487,35 @@ class StateController:
             elif current == AppState.PLAYING:
                 # TTS playing — record intent (will apply in _handle_play_complete)
                 self._desired_state_after_play = AppState.OFF
+
+    def _handle_hold_ended(self, event: HoldCaptureEnded) -> None:
+        """Finish a released turn or discard it if the release was lost.
+
+        The capture gate must already be closed by the event producer. Flushing
+        queues SpeechEnded after this event; keep the pending OFF state until
+        that segment completes, rather than invalidating it before delivery.
+        """
+        current = self._state_manager.state
+        if event.cancelled:
+            self._desired_state_after_play = AppState.OFF if self.play_in_progress else AppState.LISTENING
+            self._discard_capture()
+            if current != AppState.OFF:
+                self._state_manager.transition(AppState.OFF, force=True)
+                if self._on_state_change:
+                    self._on_state_change(current, AppState.OFF, "hold_cancelled")
+            return
+        if current == AppState.OFF:
+            return
+        self._desired_state_after_play = AppState.OFF
+        if current in (AppState.TRANSCRIBING, AppState.INJECTING, AppState.PLAYING):
+            return
+        emitted = bool(self._engine and self._engine.audio_manager and self._engine.audio_manager.flush_vad())
+        if not emitted:
+            self._desired_state_after_play = AppState.LISTENING
+            self._state_manager.transition(AppState.OFF, force=True)
+            self._discard_capture()
+            if self._on_state_change:
+                self._on_state_change(current, AppState.OFF, "hold_empty")
 
     def _handle_discard_current(self, event: DiscardCurrent) -> None:
         """User wants to discard current recording."""

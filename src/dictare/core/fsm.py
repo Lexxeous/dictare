@@ -278,6 +278,13 @@ class SetListening(StateMessage):
     on: bool = True
 
 @dataclass(frozen=True)
+class HoldCaptureEnded(StateMessage):
+    """A held turn was released, or cancelled after a lost release."""
+
+    cancelled: bool = False
+    capture_generation: int | None = None
+
+@dataclass(frozen=True)
 class StrictMuted(StateMessage):
     """Close the listening state after strict mute gates capture."""
 

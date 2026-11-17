@@ -880,3 +880,78 @@ class TestAudioFeedbackSounds:
             assert DEFAULT_SOUND_READY.suffix == ".wav"
         finally:
             controller.stop()
+
+
+def test_released_hold_finishes_buffered_speech_before_going_off() -> None:
+    from dictare.core.fsm import HoldCaptureEnded
+
+    sm = StateManager(initial_state=AppState.RECORDING)
+    engine = MockEngine()
+    controller = StateController(sm)
+    controller.set_engine(engine)
+    audio = np.zeros(5000, dtype=np.float32)
+    def flush():
+        controller.send(SpeechEnded(audio_data=audio, source="vad"))
+        return True
+    engine.audio_manager.flush_vad.side_effect = flush
+    controller._handle_event(HoldCaptureEnded(source="test"))
+    assert sm.state == AppState.RECORDING
+    controller._handle_event(controller._queue.get_nowait())
+    assert sm.state == AppState.TRANSCRIBING
+    assert len(engine.transcriptions) == 1
+    controller._handle_event(TranscriptionCompleted(text="hello", source="test"))
+    assert sm.state == AppState.OFF
+    assert engine.injections == [("hello", None, None)]
+    controller._cancel_transcription_watchdog()
+
+
+def test_cancelled_hold_discards_without_flushing() -> None:
+    from dictare.core.fsm import HoldCaptureEnded
+
+    sm = StateManager(initial_state=AppState.RECORDING)
+    engine = MockEngine()
+    controller = StateController(sm)
+    controller.set_engine(engine)
+    controller._handle_event(HoldCaptureEnded(cancelled=True, source="test"))
+    assert sm.state == AppState.OFF
+    engine.audio_manager.flush_vad.assert_not_called()
+    engine.audio_manager.reset_vad.assert_called_once()
+
+
+def test_released_hold_without_speech_stops_without_transcribing() -> None:
+    from dictare.core.fsm import HoldCaptureEnded
+
+    sm = StateManager(initial_state=AppState.LISTENING)
+    engine = MockEngine()
+    engine.audio_manager.flush_vad.return_value = False
+    controller = StateController(sm)
+    controller.set_engine(engine)
+    controller._handle_event(HoldCaptureEnded(source="test"))
+    assert sm.state == AppState.OFF
+    assert not engine.transcriptions
+
+
+def test_cancelled_hold_does_not_restart_after_audio_playback() -> None:
+    from dictare.core.fsm import HoldCaptureEnded
+
+    sm = StateManager(initial_state=AppState.LISTENING)
+    engine = MockEngine()
+    controller = StateController(sm)
+    controller.set_engine(engine)
+    controller._handle_event(PlayStarted(source="test"))
+    controller._handle_event(HoldCaptureEnded(cancelled=True, source="test"))
+    controller._handle_event(PlayCompleted(source="test"))
+    assert sm.state == AppState.OFF
+
+
+def test_stale_hold_end_cannot_stop_a_later_capture() -> None:
+    from dictare.core.fsm import HoldCaptureEnded
+
+    sm = StateManager(initial_state=AppState.LISTENING)
+    engine = MockEngine()
+    engine.capture_allowed = lambda generation=None: generation == 2
+    controller = StateController(sm)
+    controller.set_engine(engine)
+    controller._handle_event(HoldCaptureEnded(cancelled=True, capture_generation=1, source="test"))
+    assert sm.state == AppState.LISTENING
+    engine.audio_manager.reset_vad.assert_not_called()

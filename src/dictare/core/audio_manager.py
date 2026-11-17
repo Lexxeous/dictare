@@ -768,11 +768,12 @@ class AudioManager:
             if self._streaming_vad:
                 self._streaming_vad.end_on_silence = enabled
 
-    def flush_vad(self) -> None:
-        """Flush VAD state (send buffered audio as speech_end)."""
+    def flush_vad(self) -> bool:
+        """Flush VAD state and report whether buffered speech was emitted."""
         with self._vad_lock:
             if self._streaming_vad:
-                self._streaming_vad.flush()
+                return self._streaming_vad.flush()
+            return False
 
     def reset_vad(self) -> None:
         """Reset VAD state (discard buffered audio without processing)."""

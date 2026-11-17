@@ -369,14 +369,16 @@ class StreamingVAD:
         for i in range(0, len(audio) - chunk_size + 1, chunk_size):
             self.process_chunk(audio[i:i + chunk_size])
 
-    def flush(self) -> None:
-        """Flush any remaining audio if currently speaking."""
+    def flush(self) -> bool:
+        """Flush remaining audio and report whether a speech segment was emitted."""
         if self._is_speaking and self._audio_buffer:
             audio = np.concatenate(self._audio_buffer)
             self._audio_buffer = []
             self._is_speaking = False
             self.vad.reset()
             self.on_speech_end(audio)
+            return True
+        return False
 
     def reset(self) -> None:
         """Reset streaming state (discard accumulated audio)."""
