@@ -38,6 +38,7 @@ class WorkerTTSEngine(TTSEngine):
         # message_id -> (done_event, result_dict)
         self._pending: dict[str, tuple[threading.Event, dict[str, Any]]] = {}
         self._lock = threading.Lock()
+        self._suspended = False
 
     # ------------------------------------------------------------------
     # TTSEngine interface
@@ -57,6 +58,8 @@ class WorkerTTSEngine(TTSEngine):
         result: dict[str, Any] = {"ok": False}
 
         with self._lock:
+            if self._suspended:
+                return False
             self._pending[message_id] = (done, result)
 
         # Deliver to the __tts__ worker via SSE.
@@ -99,6 +102,25 @@ class WorkerTTSEngine(TTSEngine):
 
         return result["ok"]
 
+    def playback_permitted(self, message_id: str) -> bool:
+        """Permit only currently pending, non-suspended worker requests."""
+        with self._lock:
+            return not self._suspended and message_id in self._pending
+
+    def suspend_requests(self) -> None:
+        """Invalidate pending requests and wake callers without claiming success."""
+        with self._lock:
+            self._suspended = True
+            pending = list(self._pending.values())
+            self._pending.clear()
+            for done, result in pending:
+                result["ok"] = False
+                done.set()
+
+    def resume_requests(self) -> None:
+        with self._lock:
+            self._suspended = False
+
     def is_available(self) -> bool:
         return self._server.is_tts_connected()
 
@@ -115,10 +137,10 @@ class WorkerTTSEngine(TTSEngine):
         """Signal that the worker finished processing a message."""
         with self._lock:
             entry = self._pending.get(message_id)
-        if entry is None:
-            logger.debug("complete(%s): no pending message (timed out?)", message_id)
-            return
-        done, result = entry
-        result["ok"] = ok
-        result["duration_ms"] = duration_ms
-        done.set()
+            if entry is None:
+                logger.debug("complete(%s): no pending message (timed out?)", message_id)
+                return
+            done, result = entry
+            result["ok"] = ok
+            result["duration_ms"] = duration_ms
+            done.set()

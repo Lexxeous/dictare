@@ -200,6 +200,15 @@ def register_openvip_routes(app: FastAPI, server: OpenVIPServer) -> None:
         server.engine.complete_tts(message_id, ok=ok, duration_ms=duration_ms)
         return {"status": "ok"}
 
+    @app.get("/internal/tts/permit/{message_id}")
+    async def tts_playback_permit(message_id: str, request: Request):
+        """Worker checks its scoped, still-pending request before playback."""
+        if not server.has_permission(request, "register_tts"):
+            raise HTTPException(status_code=403, detail="Forbidden")
+        proxy = server.engine.tts_mgr._tts_proxy
+        allowed = proxy is not None and proxy.playback_permitted(message_id)
+        return JSONResponse({"allowed": allowed}, headers={"Cache-Control": "no-store"})
+
     @app.get("/openvip/status")
     async def get_status():
         """Get engine status."""
