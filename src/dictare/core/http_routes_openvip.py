@@ -62,7 +62,7 @@ def register_openvip_routes(app: FastAPI, server: OpenVIPServer) -> None:
         # Create SSE agent and register with engine
         from dictare.agent.sse import SSEAgent
 
-        agent = SSEAgent(agent_id, server)
+        agent = SSEAgent(agent_id, server, queue=queue)
         server.engine.register_agent(agent)
         is_tts = agent_id == DictareEngine.TTS_AGENT_ID
         if is_tts:

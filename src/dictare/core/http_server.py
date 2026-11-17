@@ -514,6 +514,24 @@ class OpenVIPServer:
 
         return False
 
+    def put_message_for_queue(self, agent_id: str, message: dict, expected: asyncio.Queue) -> bool:
+        """Schedule only on the specified still-current SSE connection.
+
+        This prevents a deferred message from being redirected to a later
+        connection that happens to reuse the same agent ID. Scheduling is not
+        a remote delivery acknowledgement.
+        """
+        with self.agent_queues_lock:
+            if self.agent_queues.get(agent_id) is not expected:
+                return False
+            if not (self._loop and self._loop.is_running()):
+                return False
+            try:
+                self._loop.call_soon_threadsafe(expected.put_nowait, message)
+            except RuntimeError:
+                return False
+            return True
+
     def notify_status_change(self) -> None:
         """Thread-safe: push current status to all SSE status subscribers.
 
