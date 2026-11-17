@@ -157,6 +157,9 @@ class StateController:
 
     def _handle_event(self, event: StateMessage) -> None:
         """Handle a single event. Called sequentially, never concurrently."""
+        if isinstance(event, (SpeechStarted, SpeechEnded, TranscriptionCompleted)):
+            if self._engine and not self._engine.capture_allowed(event.capture_generation):
+                return
         if isinstance(event, SpeechStarted):
             self._handle_speech_start(event)
         elif isinstance(event, SpeechEnded):
@@ -234,7 +237,8 @@ class StateController:
         self._start_transcription_watchdog()
         if self._engine:
             self._engine.transcribe_and_process(
-                event.audio_data, agent=event.agent
+                event.audio_data, agent=event.agent,
+                **({"capture_generation": event.capture_generation} if event.capture_generation is not None else {}),
             )
 
     def _start_transcription_watchdog(self) -> None:
@@ -243,6 +247,7 @@ class StateController:
         self._transcription_watchdog = threading.Timer(
             self.TRANSCRIPTION_TIMEOUT,
             self._on_transcription_timeout,
+            kwargs={"capture_generation": getattr(self._engine, "_capture_generation", None)},
         )
         self._transcription_watchdog.daemon = True
         self._transcription_watchdog.start()
@@ -253,14 +258,14 @@ class StateController:
             self._transcription_watchdog.cancel()
             self._transcription_watchdog = None
 
-    def _on_transcription_timeout(self) -> None:
+    def _on_transcription_timeout(self, capture_generation: int | None = None) -> None:
         """Watchdog fired: STT took too long, force recovery."""
         if self._state_manager.state == AppState.TRANSCRIBING:
             logger.warning(
                 "Transcription watchdog timeout (%.0fs) — forcing recovery",
                 self.TRANSCRIPTION_TIMEOUT,
             )
-            self.send(TranscriptionCompleted(text="", source="timeout"))
+            self.send(TranscriptionCompleted(text="", source="timeout", capture_generation=capture_generation))
 
     def _handle_transcription_complete(self, event: TranscriptionCompleted) -> None:
         """Transcription finished."""
@@ -271,7 +276,8 @@ class StateController:
             self._pending_transcription = event
             # Still inject the text (goes to correct agent via captured agent)
             if self._engine and event.text:
-                self._engine.inject_text(event.text, agent=event.agent, language=event.language)
+                self._engine.inject_text(event.text, agent=event.agent, language=event.language,
+                                         **({"capture_generation": event.capture_generation} if event.capture_generation is not None else {}))
             return
 
         # Normal flow: transition to target state and inject
@@ -283,7 +289,11 @@ class StateController:
             self._on_state_change(old_state, target_state, "transcription_complete")
 
         if self._engine and event.text:
-            self._engine.inject_text(event.text, agent=event.agent, language=event.language)
+            self._engine.inject_text(event.text, agent=event.agent, language=event.language,
+                                     **({"capture_generation": event.capture_generation} if event.capture_generation is not None else {}))
+
+        if target_state == AppState.OFF:
+            self._discard_capture()
 
         # Process queued audio only when going back to LISTENING
         if target_state == AppState.LISTENING and self._engine:
@@ -367,6 +377,15 @@ class StateController:
         # Process any queued audio now that we're listening again
         if target_state == AppState.LISTENING and self._engine:
             self._engine.process_queued_audio()
+        elif target_state == AppState.OFF:
+            self._discard_capture()
+
+    def _discard_capture(self) -> None:
+        """Invalidate work and its watchdog together on the controller owner."""
+        self._cancel_transcription_watchdog()
+        self._pending_transcription = None
+        if self._engine:
+            self._engine.discard_current_internal()
 
     def _handle_hotkey_toggle(self, event: HotkeyPressed) -> None:
         """User wants to toggle listening."""
@@ -385,8 +404,7 @@ class StateController:
             previous = current  # Capture before transition
             if self._state_manager.try_transition(AppState.OFF):
                 # Clear buffered audio
-                if self._engine:
-                    self._engine.discard_current_internal()
+                self._discard_capture()
                 if self._on_state_change:
                     self._on_state_change(previous, AppState.OFF, "hotkey_toggle")
 
@@ -429,6 +447,7 @@ class StateController:
         elif not event.on:
             if current == AppState.LISTENING:
                 if self._state_manager.try_transition(AppState.OFF):
+                    self._discard_capture()
                     if self._on_state_change:
                         self._on_state_change(AppState.LISTENING, AppState.OFF, "set_listening")
             elif current in (AppState.RECORDING, AppState.TRANSCRIBING, AppState.INJECTING):
@@ -440,11 +459,12 @@ class StateController:
 
     def _handle_discard_current(self, event: DiscardCurrent) -> None:
         """User wants to discard current recording."""
-        if self._engine:
-            self._engine.discard_current_internal()
+        self._discard_capture()
 
-        if self._state_manager.state == AppState.RECORDING:
-            old_state = AppState.RECORDING
-            self._state_manager.transition(AppState.LISTENING, force=True)
+        if self._state_manager.state in (AppState.RECORDING, AppState.TRANSCRIBING, AppState.INJECTING) and not self.play_in_progress:
+            old_state = self._state_manager.state
+            target = self._desired_state_after_play
+            self._desired_state_after_play = AppState.LISTENING
+            self._state_manager.transition(target, force=True)
             if self._on_state_change:
-                self._on_state_change(old_state, AppState.LISTENING, "discard")
+                self._on_state_change(old_state, target, "discard")

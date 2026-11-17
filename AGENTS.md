@@ -47,6 +47,10 @@ boundaries. Keep those documents aligned with the implementation.
   actual receive/delivery/logging paths in privacy tests rather than copying
   truncation or redaction expressions into tests. Document persistent counts,
   metadata, synthesis caches and agent-owned history separately.
+- Keep capture lifetime separate from recognition-worker recovery. Carry capture
+  identity through VAD/jobs/completions/timeouts and check it before side effects.
+  Reset VAD before advancing capture generation; never acquire the delivery lock
+  from a VAD callback holding the VAD lock. See ARCHITECTURE.md for ownership.
 - Do not add dependencies for a small local change. For substantial new
   functionality, review existing project code and maintained library options,
   then record any material adoption decision in the appropriate documentation.

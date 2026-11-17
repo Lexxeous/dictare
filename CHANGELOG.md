@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Omit transcript previews and recognized command text from normal session and
   engine logs; keep speech synthesis diagnostics to counts and request metadata.
+- Reject canceled capture jobs, results and watchdog events after Discard or a
+  completed Stop, preventing late text or state changes after listening resumes.
 - Clear outdated settings validation errors when correcting or retrying a save,
   and report batch validation failures without including other config values.
 - Treat a trailing resume as named-agent continuation; resolve and display the

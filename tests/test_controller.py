@@ -56,10 +56,13 @@ class MockEngine:
         self.injections: list[Any] = []
         self.agent_switches: list[tuple[str, int]] = []
 
-    def transcribe_and_process(self, audio_data: Any, agent: Any = None) -> None:
+    def capture_allowed(self, generation: int | None = None) -> bool:
+        return True
+
+    def transcribe_and_process(self, audio_data: Any, agent: Any = None, capture_generation: int | None = None) -> None:
         self.transcriptions.append((audio_data, agent))
 
-    def inject_text(self, text: str, agent: Any = None, language: str | None = None) -> None:
+    def inject_text(self, text: str, agent: Any = None, language: str | None = None, capture_generation: int | None = None) -> None:
         self.injections.append((text, agent, language))
 
     def process_queued_audio(self) -> None:
