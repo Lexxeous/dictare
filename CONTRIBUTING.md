@@ -34,6 +34,10 @@ An isolated worktree can reuse a compatible contributor environment by setting
 `DICTARE_DEV_PYTHON` to that checkout's `.venv/bin/python`. The helper still
 imports the selected worktree's source and uses its separate `.dictare-dev/`
 state and explicit ports; it never invokes the installed `dictare` command.
+Keep local checkouts under the ignored `.worktrees/<name>/` directory inside
+this repository. Checkout-specific helpers and logs belong in that checkout's
+`.dictare-dev/checks/` and `.dictare-dev/logs/`, respectively. Keep the container
+free of loose scripts and logs; use `git worktree move` when relocating.
 The source serve/stack runners honor Dictare's restart exit code after settings
 changes. Normal shutdown exits; Ctrl+C stops only their owned engine/UI process
 groups, including child processes, without managing the installed service.
@@ -65,14 +69,13 @@ pnpm build
 ## Scope and Branches
 
 For this fork's local request register, follow the
-[feature branch and checkpoint standard](.github/feature-workflow.md): create
-`feature/<request-name>` immediately when a request is added, using the exact
-request folder name. Record its base and branch in the request notes and
-roadmap. Implement trivial requests before small, then medium, then large;
-validate and commit scoped checkpoints on isolated feature branches. Review
-build/runner scripts with each feature and keep commands/documentation current.
-These fork-specific rules take precedence over the general naming examples
-below when working from the local feature-request register.
+[development and checkpoint standard](.github/feature-workflow.md). Develop
+requests directly on `develop` in the main checkout, reuse its source server,
+and keep independently reviewable changes in scoped, validated commits.
+Existing feature worktrees are historical or contain checkpoints to integrate;
+do not delete them without reviewing their work.
+
+The following general guidance applies when preparing an upstream contribution:
 
 - Start from the target branch named by the issue or maintainer. If none is
   specified for an upstream contribution, check the repository's current
@@ -91,12 +94,12 @@ For local work in a personal fork, follow the fork's integration-branch policy.
 The repository-specific agent guide describes the `develop`-based workflow used
 for this checkout.
 
-Feature branches start from `develop` and merge back after validation. Main
-receives selected validated develop batches and is the release branch. Track
+Local feature work is committed directly to `develop`. Main receives selected
+validated develop batches and is the release branch. Track
 patch/minor intent in a public `.changes/<request-name>.toml` with each
 implementation; recalculate its target using `scripts/release_plan.py` against
-fresh main refs/tags before pushing or merging. Fixed future versions in
-feature branches become stale when merge order changes. The initial pending
+fresh main refs/tags before pushing or releasing. Fixed future versions become
+stale when release order changes. The initial pending
 release is 0.7.0; later targets follow the latest main stable release and the
 highest intent in the batch. See the feature workflow for exact gates.
 

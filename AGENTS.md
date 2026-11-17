@@ -75,40 +75,30 @@ The CI workflow also runs Bandit and the full test suite with coverage. For UI
 changes, run the UI build from `ui/` and inspect the resulting diff in
 `src/dictare/ui/dist/`.
 
-## Branches and Release Notes
+## Development and Release Notes
 
-Follow [.github/feature-workflow.md](.github/feature-workflow.md) as the
-authoritative request/branch/checkpoint workflow.
-
-- Immediately create `feature/<request-name>` from the committed `develop`
-  base when adding a request. Use its full folder name, record branch/base in
-  the request README, root register, and roadmap, and never overwrite an
-  existing branch. Do not switch a dirty checkout to register a request.
-- Implement in order: trivial, small, medium, large. Use isolated worktrees,
-  meaningful focused tests, and validated scoped checkpoint commits before
-  advancing. Record blockers and ask when a required check or decision cannot
-  be resolved. Do not bundle unrelated work or stack independent branches.
-- Review local and workspace build/runner scripts at each feature checkpoint;
-  update them with changed commands, dependencies, packaging, or behavior and
-  record validation. Keep findings and statuses current in the local notes.
-- Keep each branch and pull request limited to one independently reviewable
-  outcome. Do not bring unrelated local feature requests into a code change.
-- Put user-visible unreleased changes under `[Unreleased]` in `CHANGELOG.md`.
-  Do not bump the package version for an ordinary contribution. Release
-  versions and publishing are maintainer actions handled by the workflow in
-  `.github/workflows/publish-pypi.yml`.
-- Do not push, open a pull request, merge, or create a release unless the user
-  asks for that action.
-
-The standing feature workflow now permits merging validated implementations
-back into develop during requested feature work. All feature branches start
-from develop; main is reserved for selected release batches. Before push/merge,
-refresh release refs/tags and recalculate patch/minor intent using
-`scripts/release_plan.py`; keep local request/register/roadmap targets current.
-Publishing and remote pushes/PRs still require explicit authorization. Follow
-the detailed workflow for intent records, local dev labels, and main release gates.
+Follow [.github/feature-workflow.md](.github/feature-workflow.md) for this
+fork's request, checkpoint, and release workflow. Work directly on `develop`
+in the main checkout and use its existing source server. New requests do not
+need feature branches or separate worktrees/servers. Preserve existing branches,
+worktrees and uncommitted changes; integrate their useful checkpoints deliberately.
+Keep checkpoints scoped, tested and committed, and document status/next steps.
+Review build and runner scripts when behavior or dependencies change. Use
+`[Unreleased]` in CHANGELOG and public `.changes/` files for release intent;
+recalculate from current release history instead of reserving versions. `main`
+is reserved for selected release batches. Pushes, PRs and publishing require
+explicit authorization.
 
 ## Private Local Feature Requests
+
+Keep existing optional Git worktrees under this repository's ignored `.worktrees/` folder,
+never beside the repository in KGProjects. Keep each checkout's local check/run
+helpers under `.dictare-dev/checks/` and its validation logs under
+`.dictare-dev/logs/`; do not collect loose scripts or logs at the worktree root.
+Cross-feature validation belongs to the relevant tooling checkout and writes
+each suite's log into that suite's own checkout. Move registered checkouts with
+`git worktree move`, and repair local dependency links/configuration and notes
+when paths change. Preserve branch tips and uncommitted work.
 
 `feature-requests/` is ignored by Git on purpose. Put each independent request
 under `feature-requests/<complexity>/<request-name>/`, using exactly the

@@ -1,53 +1,34 @@
-# Feature branch and checkpoint standard
+# Develop and checkpoint standard
 
 This page is the authoritative workflow for this fork's local feature requests.
 Read it with `AGENTS.md` and `CONTRIBUTING.md` before adding or implementing a
 request. The integration branch is `develop`.
 
-## Register a request immediately
+## Register and implement requests
 
-1. Create its local folder at
-   `feature-requests/<trivial|small|medium|large>/<request-name>/`.
-2. Immediately create `feature/<request-name>` from the current committed
-   `develop` base. Use the complete request folder name, without the complexity
-   segment. This applies to fixes and documentation requests in this register
-   as well as new functionality. A later complexity change does not rename
-   the branch.
-3. Create the branch reference without switching a dirty checkout. Check for
-   an existing matching branch first; do not reset, overwrite, or repurpose it.
-4. Record the exact branch name, base commit, complexity, status, next action,
-   and eventual worktree path in the request README, root request README, and
-   implementation roadmap. Update them in the same task. The local notes stay
-   Git-ignored, including after implementation or release.
-
-## Isolate implementation
-
-- Use one feature branch and one independently reviewable PR per request.
-  Preserve other sessions' and the user's working changes. Prefer a separate
-  worktree for each implementation; do not copy the whole dirty checkout into
-  a feature branch.
-- Implement in complexity order: **trivial, small, medium, large**. The local
-  roadmap records the order within each group. Begin the next feature after
-  the current checkpoint passes its checks and is committed. If a required
-  check or decision blocks progress, record the blocker and ask the user;
-  administrative branch creation can continue without claiming implementation.
-- Independent features share the committed integration base. Do not stack
-  unrelated feature branches. A real dependency requires a documented base
-  and explicit plan; no automatic merging or cherry-picking of unrelated work.
-- Develop common contributor infrastructure separately, validate it, and
-  integrate it into develop before using it as a shared feature prerequisite.
-  Every feature branch must be based on develop. Refresh existing feature
-  branches from develop safely; never reset an implementation to a new base.
+1. Create or update the ignored local request folder under
+   `feature-requests/<trivial|small|medium|large>/<request-name>/` and record
+   status, complexity, evidence and next action in the request and roadmap.
+2. Develop directly in the main Dictare checkout on `develop`, using its existing
+   `./scripts/dev.sh stack` source server. New requests do not require feature
+   branches, worktrees, or separate preview servers.
+3. Keep unrelated changes separate in focused commits. Inspect status and diff
+   before editing; coordinate explicitly if another session owns the same files.
+   Preserve existing feature branches/worktrees and their unmerged checkpoints;
+   integrate relevant completed work deliberately without resetting them.
+4. Continue the documented trivial, small, medium, large order unless the user
+   explicitly prioritizes a request. Update local notes with commit and release
+   intent as work proceeds.
 
 ## Validate and commit checkpoints
 
 At a coherent checkpoint:
 
-1. Inspect the branch diff and stage only that request's intended files/hunks.
+1. Inspect the checkout diff and stage only that request's intended files/hunks.
    Add meaningful focused regression tests for changed behavior; follow the
    existing test patterns and mock hardware, services, and provider responses.
 2. Run relevant focused tests and lint. Run the repository-wide Python checks
-   required by CI before declaring the branch ready for review. UI changes
+   required by CI before declaring the feature ready for review. UI changes
    require the UI build, review of generated packaged assets, and visual checks
    at desktop/narrow widths. Native integration also requires appropriate
    platform/hardware checks before support is advertised.
@@ -61,17 +42,16 @@ At a coherent checkpoint:
    dry-run plans; use isolated checks for lifecycle behavior. Record explicitly
    when no script change is needed and why.
 5. Record exact commands, results, known failures, remaining acceptance work,
-   decisions, base commit, and branch/worktree in the request and roadmap.
+   decisions, commit, and relevant historical branch/worktree in the request and roadmap.
    Missing tools or unavailable hardware are outstanding validation, not passes.
 6. When the checkpoint's required checks pass and the staged diff is clean and
-   scoped, commit it on its feature branch with a short imperative subject.
-   Record the commit in the local notes, verify the worktree is clean, and
-   continue in size order. Further commits can complete later checkpoints.
+   scoped, commit it on develop with a short imperative subject.
+   Record the commit in the local notes, verify the scoped changes are committed,
+   and continue in size order. Further commits can complete later checkpoints.
 
-Keep **checkpoint committed**, **Ready for review**, **merged**, and
-**Released** distinct. Only claim each when its evidence exists. Merge a
-validated feature into develop as part of the requested implementation flow;
-do not merge while required acceptance or regression checks are unresolved.
+Keep **checkpoint committed**, **Ready for review**, and **Released** distinct.
+A validated checkpoint is committed directly to develop; do not claim a feature
+complete while required acceptance or regression checks remain unresolved.
 Select intermittent validated develop batches for main during an explicit
 release-preparation task. Publish real releases from main only. Pushing,
 opening remote PRs, or publishing still requires the user's authorization.
@@ -82,18 +62,18 @@ opening remote PRs, or publishing still requires the user's authorization.
   Add the matching public `.changes/<request-name>.toml` with its first
   implementation checkpoint: patch for compatible fixes, minor for added
   capabilities, or none for contributor-only work. Never copy private notes.
-- Do not reserve a future numeric version per feature. Before push/merge,
-  refresh the fork's main/develop refs and stable tags, sync the feature with
-  develop, and run `.venv/bin/python scripts/release_plan.py --main-ref <fork-remote>/main`.
+- Do not reserve a future numeric version per feature. Before push or release,
+  refresh the fork's main/develop refs and stable tags and run
+  `.venv/bin/python scripts/release_plan.py --main-ref <fork-remote>/main`.
   Record the recalculated target and the baseline ref/commit in local notes.
   CI also recalculates the plan on feature/develop/main pushes and PRs.
 - A release batch uses the highest pending intent, with the pending main
   release as a floor. Several fixes in one batch consume one patch version;
-  a minor feature promotes that batch to a minor release. A feature merged
+  a minor feature promotes that batch to a minor release. A feature completed
   after a completed main release recalculates against that new stable tag.
   Already-released immutable intent records do not bump the next batch.
-  After a main release, merge main back into develop before creating or
-  refreshing feature branches so the released source version, tags, and
+  After a main release, merge main back into develop before continuing
+  development so the released source version, tags, and
   consumed intents become the new baseline.
 - The initial selected target is to finish 0.7.0, currently 0.7.0rc2 in source.
   A patch arriving before that release joins 0.7.0. After 0.7.0 is released,

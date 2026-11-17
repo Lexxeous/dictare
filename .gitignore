@@ -87,6 +87,7 @@ docs/
 private/
 feature-requests/
 .dictare-dev/
+/.worktrees/
 
 scripts/dev/
 
