@@ -27,6 +27,7 @@ from dictare.core.fsm import (
     SpeechEnded,
     SpeechStarted,
     StateMessage,
+    StrictMuted,
     SwitchAgent,
     TranscriptionCompleted,
 )
@@ -176,6 +177,14 @@ class StateController:
             self._handle_agent_switch(event)
         elif isinstance(event, SetListening):
             self._handle_set_listening(event)
+        elif isinstance(event, StrictMuted):
+            self._cancel_transcription_watchdog()
+            self._pending_transcription = None
+            self._desired_state_after_play = AppState.OFF
+            old = self._state_manager.state
+            self._state_manager.transition(AppState.OFF, force=True)
+            if self._on_state_change and old != AppState.OFF:
+                self._on_state_change(old, AppState.OFF, "strict_mute")
         elif isinstance(event, DiscardCurrent):
             self._handle_discard_current(event)
 
@@ -396,6 +405,11 @@ class StateController:
         """User wants to toggle listening."""
         current = self._state_manager.state
 
+        if getattr(self._engine, "_strict_muted", False) is True:
+            if not self._review_pending():
+                self._engine.resume_strict_mute()
+            return
+
         if current == AppState.OFF:
             if self._review_pending():
                 return
@@ -448,6 +462,8 @@ class StateController:
         current = self._state_manager.state
 
         if event.on and current == AppState.OFF:
+            if getattr(self._engine, "_strict_muted", False) is True:
+                return
             if self._review_pending():
                 return
             if self._state_manager.try_transition(AppState.LISTENING):

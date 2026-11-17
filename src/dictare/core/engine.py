@@ -24,6 +24,7 @@ from dictare.core.fsm import (
     SpeechEnded,
     SpeechStarted,
     StateManager,
+    StrictMuted,
     SwitchAgent,
     TranscriptionCompleted,
 )
@@ -216,6 +217,8 @@ class DictareEngine:
         # Voice muted flag — when True, MuteFilter discards all text
         # except listen triggers. Engine stays in LISTENING (VAD+STT active).
         self._voice_muted = False
+        # Separate from standard voice mute; not yet exposed in the UI.
+        self._strict_muted = False
         self._capture_generation = 0  # Independent of hung-worker recovery.
 
         # Guard against concurrent audio reconnect attempts
@@ -661,6 +664,8 @@ class DictareEngine:
 
     def _on_vad_speech_start(self) -> None:
         """Handle VAD speech start detection."""
+        if not self.capture_allowed():
+            return
         # Send event to controller - it handles the state transition
         self._controller.send(SpeechStarted(source="vad", capture_generation=self._capture_generation))
 
@@ -669,6 +674,8 @@ class DictareEngine:
 
     def _on_vad_speech_end(self, audio_data: Any) -> None:
         """Handle VAD speech end detection."""
+        if not self.capture_allowed():
+            return
         capture_generation = self._capture_generation
         # Capture agent NOW, before sending event
         # This ensures audio goes to the agent that was active when speech ended
@@ -695,7 +702,7 @@ class DictareEngine:
 
     def capture_allowed(self, capture_generation: int | None = None) -> bool:
         """Whether work belongs to the current capture lifetime, not an old discard."""
-        return not self.review_pending() and (
+        return not self._strict_muted and not self.review_pending() and (
             capture_generation is None or capture_generation == self._capture_generation
         )
 
@@ -907,7 +914,7 @@ class DictareEngine:
 
         Called by StateController after transcription completes.
         """
-        if not self.audio_manager:
+        if not self.audio_manager or not self.capture_allowed():
             return
 
         capture_generation = self._capture_generation
@@ -1140,7 +1147,7 @@ class DictareEngine:
         """Play a sound if the feedback policy allows it."""
         from dictare.audio.beep import get_sound_for_event, play_sound_file_async
 
-        if self._voice_muted:
+        if self._voice_muted or self._strict_muted:
             return
         if not self._feedback_policy.should_play(
             event, self._agent_mgr.current_agent, self.config.audio,
@@ -1297,6 +1304,34 @@ class DictareEngine:
             phrase = random.choice(phrases)  # noqa: S311
             self.tts_mgr.speak_text(phrase)
 
+        self._notify_status()
+
+    def strict_mute(self) -> None:
+        """Immediately gate capture; the physical hotkey is needed to resume.
+
+        Kept internal until queued audio and TTS cancellation are implemented.
+        """
+        from dictare.audio.beep import stop_loop
+
+        with self._injection_lock:
+            if self._strict_muted:
+                return
+            self._strict_muted = True
+            self.discard_current_internal()
+            self._controller.send(StrictMuted(source="strict_mute"))
+        stop_loop()
+        self.tts_mgr.stop_speaking()
+        self._notify_status()
+
+    def resume_strict_mute(self) -> None:
+        """Resume the strict gate only through the controller's hotkey path."""
+        with self._injection_lock:
+            if not self._strict_muted or self.review_pending():
+                return
+            self.discard_current_internal()
+            self._strict_muted = False
+            self._voice_muted = False
+            self._controller.send(SetListening(on=True, source="strict_resume"))
         self._notify_status()
 
     def unmute(self) -> None:
@@ -1586,6 +1621,9 @@ class DictareEngine:
             Response dict.
         """
         command = body.get("command", "")
+
+        if command in {"stt.start", "stt.toggle"} and self._strict_muted:
+            return {"openvip": "1.0", "status": "error", "error": "Use the hotkey to resume from strict mute."}
 
         if command in {"stt.start", "stt.toggle"} and self.review_pending():
             return {

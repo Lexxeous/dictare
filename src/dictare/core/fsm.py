@@ -278,6 +278,12 @@ class SetListening(StateMessage):
     on: bool = True
 
 @dataclass(frozen=True)
+class StrictMuted(StateMessage):
+    """Close the listening state after strict mute gates capture."""
+
+    pass
+
+@dataclass(frozen=True)
 class DiscardCurrent(StateMessage):
     """User wants to discard current recording."""
 

@@ -71,7 +71,7 @@ class _ControllerEvents(EngineEvents):
 
         # A muted engine must not announce later audio activity. Stop an
         # already-running loop above before suppressing new feedback.
-        if eng is not None and eng._voice_muted is True:
+        if eng is not None and (eng._voice_muted is True or eng._strict_muted is True):
             return
 
         if new == AppState.LISTENING and old == AppState.OFF:
@@ -126,7 +126,7 @@ class _ControllerEvents(EngineEvents):
             logger.info("on_agent_change: agent_announce disabled")
             return
         eng = self._engine_ref
-        if eng and eng._voice_muted is True:
+        if eng and (eng._voice_muted is True or eng._strict_muted is True):
             return
         if eng:
             eng.speak_agent(agent_name)
