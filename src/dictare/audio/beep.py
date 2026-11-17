@@ -100,6 +100,8 @@ _preload_sounds()
 _play_queue: queue.Queue[tuple[str, float, Callable[[], None] | None, int, Callable[[], None] | None] | None] = queue.Queue()
 _play_generation = 0
 _play_generation_lock = threading.RLock()
+_feedback_suspended = False
+_fallback_process: subprocess.Popen | None = None
 _worker_started = False
 _worker_lock = threading.Lock()
 _audio_control_execute: Callable[[str, Callable[[], Any]], Any] | None = None
@@ -137,7 +139,16 @@ def _enqueue_sound(
     on_cancel: Callable[[], None] | None = None,
 ) -> None:
     with _play_generation_lock:
-        _play_queue.put((path, volume, on_complete, _play_generation, on_cancel))
+        suspended = _feedback_suspended
+        if not suspended:
+            _play_queue.put((path, volume, on_complete, _play_generation, on_cancel))
+    if suspended:
+        for callback in (on_cancel, on_complete):
+            if callback:
+                try:
+                    callback()
+                except Exception:
+                    pass
 
 
 def _is_current_playback(generation: int) -> bool:
@@ -164,6 +175,28 @@ def cancel_pending_feedback() -> None:
     with _play_generation_lock:
         _play_generation += 1
         stop_loop()
+
+
+def suspend_feedback() -> None:
+    """Suppress new feedback, cancel queued items, and stop active output."""
+    global _feedback_suspended, _play_generation
+    with _play_generation_lock:
+        _feedback_suspended = True
+        _play_generation += 1
+        stop_loop()
+        if _fallback_process is not None:
+            try:
+                _fallback_process.terminate()
+            except (ProcessLookupError, OSError):
+                pass
+    stop_portaudio_output()
+
+
+def resume_feedback() -> None:
+    """Permit newly requested feedback after strict mute ends."""
+    global _feedback_suspended
+    with _play_generation_lock:
+        _feedback_suspended = False
 
 
 def _ensure_worker() -> None:
@@ -252,7 +285,7 @@ def _audio_worker() -> None:
         except Exception:
             logger.debug("Audio playback failed for %s", path_str, exc_info=True)
             if _is_current_playback(generation):
-                _play_sound_file_fallback(path_str)
+                _play_sound_file_fallback(path_str, generation)
             else:
                 cancelled = True
         finally:
@@ -433,12 +466,14 @@ def start_loop(path: str | Path, volume: float = 1.0) -> None:
     """
     global _loop_pending_timer, _loop_volume
 
-    if _loop_pending_timer is not None:
-        _loop_pending_timer.cancel()
-        _loop_pending_timer = None
-
-    _loop_volume = volume
-    _loop_active.set()
+    with _play_generation_lock:
+        if _feedback_suspended:
+            return
+        if _loop_pending_timer is not None:
+            _loop_pending_timer.cancel()
+            _loop_pending_timer = None
+        _loop_volume = volume
+        _loop_active.set()
     _start_loop_now(str(path))
 
 def stop_loop() -> None:
@@ -454,20 +489,34 @@ def is_looping() -> bool:
     """Return True if a loop is currently active."""
     return _loop_active.is_set()
 
-def _play_sound_file_fallback(path_str: str) -> None:
-    """Fallback: play via system commands when sounddevice is unavailable."""
-    try:
-        if sys.platform == "darwin":
-            subprocess.run(["afplay", path_str], capture_output=True, timeout=_FALLBACK_CMD_TIMEOUT)
-        else:
-            for cmd in [["paplay", path_str], ["aplay", "-q", path_str]]:
-                try:
-                    subprocess.run(cmd, capture_output=True, timeout=_FALLBACK_CMD_TIMEOUT)
-                    break
-                except FileNotFoundError:
-                    continue
-    except Exception:
-        pass
+def _play_sound_file_fallback(path_str: str, generation: int) -> None:
+    """Play a fallback process that strict mute can terminate."""
+    global _fallback_process
+    commands = [["afplay", path_str]] if sys.platform == "darwin" else [
+        ["paplay", path_str], ["aplay", "-q", path_str],
+    ]
+    for command in commands:
+        try:
+            with _play_generation_lock:
+                if _feedback_suspended or generation != _play_generation:
+                    return
+                proc = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                _fallback_process = proc
+            try:
+                proc.wait(timeout=_FALLBACK_CMD_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                proc.terminate()
+                proc.wait()
+            finally:
+                with _play_generation_lock:
+                    if _fallback_process is proc:
+                        _fallback_process = None
+            return
+        except FileNotFoundError:
+            continue
+        except Exception:
+            return
+
 
 def play_sound_file_async(path: str | Path, *, volume: float = 1.0) -> None:
     """Play a sound file asynchronously (non-blocking, fire-and-forget).
