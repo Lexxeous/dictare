@@ -15,10 +15,11 @@
 		allowCustom?: boolean;
 		/** If true, show just "Default" without appending the default display name. */
 		noDefaultSuffix?: boolean;
+		defaultLabelOverride?: string;
 		onchange: (value: string) => void;
 	}
 
-	let { options, value, defaultDisplay, allowCustom = false, noDefaultSuffix = false, onchange }: Props = $props();
+	let { options, value, defaultDisplay, allowCustom = false, noDefaultSuffix = false, defaultLabelOverride, onchange }: Props = $props();
 
 	/** Internal sentinel for the Select widget — never emitted externally. */
 	const SENTINEL = "__default__";
@@ -30,7 +31,7 @@
 	const optionValues = $derived(options.map((o) => o.value));
 
 	const defaultLabel = $derived(
-		noDefaultSuffix || !defaultDisplay ? "Default" : `Default (${defaultDisplay})`
+		defaultLabelOverride ?? (noDefaultSuffix || !defaultDisplay ? "Default" : `Default (${defaultDisplay})`)
 	);
 
 	const isDefault = $derived(value === "" || value == null);

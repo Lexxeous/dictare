@@ -165,3 +165,16 @@ def test_pipeline_complex_settings_cannot_be_replaced_by_scalar_form(path):
     with pytest.raises(KeyError):
         set_config_values({'pipeline.mute_filter.mute_triggers': 'bad'}, path)
     assert path.read_bytes() == original
+
+
+def test_agent_default_and_permissions_preserve_profiles(path):
+    path.write_text('[agent_profiles]\ndefault = "codex" # keep\n[agent_profiles."my.profile"]\ncommand = ["example"]\nextra = "preserve"\n')
+    set_config_values({'agent_profiles.default': 'my.profile', 'agent_profiles.live_dangerously': 'true'}, path)
+    config = load_config(path)
+    assert config.agent_profiles.default == 'my.profile'
+    assert config.agent_profiles.live_dangerously
+    assert config.agent_profiles.get('my.profile').command == ['example']
+    assert '# keep' in path.read_text()
+    assert 'extra = "preserve"' in path.read_text()
+    set_config_values({'agent_profiles.default': None}, path)
+    assert load_config(path).agent_profiles.default is None

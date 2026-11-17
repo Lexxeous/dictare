@@ -8,6 +8,7 @@
 	import TomlField from "./fields/TomlField.svelte";
 	import NestedSettings from "./fields/NestedSettings.svelte";
 	import SoundSettings from "./fields/SoundSettings.svelte";
+	import AgentSettings from "./fields/AgentSettings.svelte";
 	import ShortcutsField from "./fields/ShortcutsField.svelte";
 	import KeyCaptureField from "./fields/KeyCaptureField.svelte";
 	import { resolveFieldSchema, getEnumValues } from "$lib/schema";
@@ -145,6 +146,8 @@
 	<div class="px-4">
 		<ShortcutsField />
 	</div>
+{:else if field.key === "agent_profiles"}
+	<AgentSettings />
 {:else if field.key === "audio.sounds"}
 	<SoundSettings {schema} defaults={field.default} />
 {:else if field.key === "audio.advanced" || field.key === "stt.advanced" || field.key === "pipeline.mute_filter" || field.key === "pipeline.submit_filter" || field.key === "pipeline.agent_filter"}
