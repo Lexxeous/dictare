@@ -116,7 +116,9 @@ class KokoroTTS(TTSEngine):
     @staticmethod
     def _model_dir() -> Path:
         """Return the directory for kokoro model files."""
-        return Path.home() / ".local" / "share" / "dictare" / "models" / "kokoro"
+        from dictare.utils.paths import get_data_dir
+
+        return get_data_dir() / "models" / "kokoro"
 
     @staticmethod
     def _download_model(model_dir: Path) -> None:

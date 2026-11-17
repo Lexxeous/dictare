@@ -25,8 +25,10 @@ from typing import Any
 
 from pythonjsonlogger.json import JsonFormatter
 
+from dictare.utils.paths import get_data_dir
+
 # Default log directory
-DEFAULT_LOG_DIR = Path.home() / ".local" / "share" / "dictare" / "logs"
+DEFAULT_LOG_DIR = get_data_dir() / "logs"
 LOG_MAX_BYTES = 10 * 1024 * 1024
 LOG_BACKUP_COUNT = 5
 
@@ -39,7 +41,7 @@ def get_default_log_path(name: str = "listen") -> Path:
     Returns:
         Path to log file in default log directory.
     """
-    return DEFAULT_LOG_DIR / f"{name}.jsonl"
+    return get_data_dir() / "logs" / f"{name}.jsonl"
 
 class DictareJsonFormatter(JsonFormatter):
     """Custom JSON formatter for dictare logs.

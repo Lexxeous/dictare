@@ -21,8 +21,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dictare import __version__
+from dictare.utils.paths import get_data_dir
 
-RUNTIME_ROOT = Path.home() / ".local" / "share" / "dictare"
+RUNTIME_ROOT = get_data_dir()
 VERSIONS_DIR = RUNTIME_ROOT / "versions"
 CURRENT_LINK = RUNTIME_ROOT / "current"
 PREVIOUS_LINK = RUNTIME_ROOT / "previous"

@@ -250,6 +250,29 @@ Full configuration reference at [dictare.io/docs/configuration](https://dictare.
 
 ## Development
 
+Use the checkout-local runner when you want to try source changes without
+calling the Homebrew-installed `dictare` command:
+
+```bash
+./scripts/dev.sh setup
+./scripts/dev.sh run --help
+./scripts/dev.sh stack
+```
+
+Open `http://127.0.0.1:5173/ui/`. In another terminal use
+`./scripts/dev.sh listen` to start capture or `./scripts/dev.sh pause` to stop
+capture. The local runner disables global hotkey handling; it does not use
+the installed macOS launcher to control the source engine.
+
+The runner uses this repository's `.venv`, keeps its copied config and runtime
+state under the ignored `.dictare-dev/` folder, and serves its engine on port
+18770 with the settings UI on port 5173. The installed service on port 8770 and
+its runtime remain separate. Add `--mlx` to `setup` on Apple Silicon if you
+want the MLX speech stack. `./scripts/dev.sh test`, `lint`, and `typecheck` run
+checks through the same local Python environment.
+
+For the underlying manual setup:
+
 ```bash
 git clone https://github.com/dragfly/dictare && cd dictare
 

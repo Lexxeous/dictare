@@ -1,0 +1,3 @@
+name = "local-source-runner"
+bump = "none"
+summary = "Provide an isolated checkout-local runner for contributor testing."

@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Development
+- Add isolated source development with checkout-local state, alternate ports,
+  explicit listening controls, and calculated development version labels.
 - Calculate release targets from pending change intent and current main tags;
   validate publishing from main and identify source runs with distinct dev labels.
 - Define one immediate feature branch per local request, complexity-ordered

@@ -189,8 +189,9 @@ def hotkey_active(engine: DictareEngine) -> bool:
         if runtime is not None:
             return bool(runtime.get("capture_healthy", False))
 
-        from pathlib import Path
-        status_file = Path.home() / ".dictare" / "hotkey_status"
+        from dictare.utils.paths import get_dictare_dir
+
+        status_file = get_dictare_dir() / "hotkey_status"
         try:
             return status_file.read_text().strip() in ("active", "confirmed")
         except FileNotFoundError:
@@ -211,8 +212,9 @@ def hotkey_status_raw(engine: DictareEngine) -> str:
         if runtime is not None:
             status = str(runtime.get("status", "unknown"))
         else:
-            from pathlib import Path
-            status_file = Path.home() / ".dictare" / "hotkey_status"
+            from dictare.utils.paths import get_dictare_dir
+
+            status_file = get_dictare_dir() / "hotkey_status"
             try:
                 status = status_file.read_text().strip()
             except FileNotFoundError:

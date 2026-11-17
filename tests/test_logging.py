@@ -30,6 +30,11 @@ class TestGetDefaultLogPath:
         path = get_default_log_path("agent.myagent")
         assert path.name == "agent.myagent.jsonl"
 
+    def test_data_directory_override(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("DICTARE_DATA_DIR", str(tmp_path))
+        path = get_default_log_path("engine")
+        assert path == tmp_path / "logs" / "engine.jsonl"
+
 class TestDictareJsonFormatter:
     """Tests for DictareJsonFormatter."""
 

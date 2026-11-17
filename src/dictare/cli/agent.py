@@ -22,7 +22,11 @@ def _try_start_service() -> None:
     Does NOT wait for the engine to become reachable — the SSE reconnect
     loop handles that.
     """
+    import os
     import sys
+
+    if os.environ.get("DICTARE_DEV_MODE"):
+        return
 
     try:
         if sys.platform == "darwin":

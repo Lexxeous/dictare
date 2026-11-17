@@ -10,6 +10,8 @@ from dictare.config import (
     OutputConfig,
     SoundConfig,
     STTConfig,
+    get_config_dir,
+    get_config_path,
     load_config,
     load_raw_values,
 )
@@ -67,6 +69,13 @@ class TestConfigLoading:
         config = load_config(Path("/nonexistent/path/config.toml"))
         assert config is not None
         assert config.audio.advanced.sample_rate == 16000
+
+    def test_config_path_environment_override(self, tmp_path: Path, monkeypatch) -> None:
+        config_path = tmp_path / "local" / "config.toml"
+        monkeypatch.setenv("DICTARE_CONFIG_PATH", str(config_path))
+
+        assert get_config_path() == config_path
+        assert get_config_dir() == config_path.parent
 
     def test_load_empty_toml(self) -> None:
         """Test loading from empty TOML file returns defaults."""
