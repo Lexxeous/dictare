@@ -213,6 +213,10 @@ export type StatusResponse = {
 		version: string;
 		mode: string;
 		state: string;
+		strict_mute_pending?: boolean;
+		strict_mute_error?: string | null;
+		strict_mute_available?: boolean;
+		strict_mute_source_test?: boolean;
 		uptime_seconds: number;
 		stt: { model_name: string; device: string; last_text: string };
 		tts: { engine: string; language: string; available: boolean; error: string | null };

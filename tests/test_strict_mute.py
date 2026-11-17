@@ -191,3 +191,19 @@ def test_restored_strict_mute_starts_without_opening_input():
     assert engine.state == AppState.OFF
     assert engine.audio_manager.start_streaming.call_args.kwargs["suspended"] is True
     assert not engine.audio_manager.start_streaming.call_args.kwargs["should_process"]()
+
+
+def test_strict_mute_availability_requires_hotkey_or_source_mode(monkeypatch):
+    import dictare.core.status_report as status_report
+
+    monkeypatch.setattr(status_report, "audio_devices", lambda: {})
+    monkeypatch.setattr(status_report, "permissions", lambda: {})
+    monkeypatch.setattr(status_report, "hotkey_active", lambda engine: False)
+    monkeypatch.setattr(status_report, "hotkey_status_raw", lambda engine: "unknown")
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    monkeypatch.delenv("DICTARE_DEV_MODE", raising=False)
+    assert engine.get_status()["platform"]["strict_mute_available"] is False
+    monkeypatch.setenv("DICTARE_DEV_MODE", "1")
+    platform = engine.get_status()["platform"]
+    assert platform["strict_mute_available"] is True
+    assert platform["strict_mute_source_test"] is True

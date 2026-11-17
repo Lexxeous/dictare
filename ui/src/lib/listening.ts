@@ -11,10 +11,24 @@ export async function setListening(on: boolean): Promise<void> {
 	if (result.status !== "ok") throw new Error("Dictare did not accept the listening request");
 }
 
+/** Enter the separate mode that can only be resumed by the hotkey. */
+export async function strictMute(): Promise<void> {
+	const response = await fetch("/openvip/control", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ command: "stt.strict_mute" }),
+		signal: AbortSignal.timeout(20000)
+	});
+	if (!response.ok) throw new Error("Could not request strict mute.");
+	const result = await response.json();
+	if (result.status !== "ok") throw new Error(result.error || "Could not confirm strict mute.");
+}
+
 export function listeningLabel(state: string): string {
 	switch (state) {
 		case "off": return "Listening is off";
 		case "muted": return "Dictation is muted";
+		case "strict_muted": return "Strict mute is on";
 		case "listening": return "Ready to hear you";
 		case "recording": return "Hearing your words";
 		case "transcribing": return "Turning speech into text";

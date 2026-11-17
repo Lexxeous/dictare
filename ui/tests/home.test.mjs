@@ -67,3 +67,16 @@ test("relative README links and heading anchors resolve deliberately", () => {
 	assert.match(html, /https:\/\/github.com\/dragfly\/dictare\/blob\/main\/LICENSE/);
 	assert.match(html, /rel="noopener noreferrer"/);
 });
+
+test("strict mute sends the dedicated command and reports refusals", async (t) => {
+	const { strictMute } = await import("../src/lib/listening.ts");
+	const fetch = t.mock.method(globalThis, "fetch", async (url, options) => {
+		assert.equal(url, "/openvip/control");
+		assert.equal(JSON.parse(options.body).command, "stt.strict_mute");
+		return Response.json({ status: "ok" });
+	});
+	await strictMute();
+	fetch.mock.mockImplementation(async () => Response.json({ status: "error", error: "A working hotkey is required" }));
+	await assert.rejects(strictMute, /working hotkey/);
+	assert.equal(listeningLabel("strict_muted"), "Strict mute is on");
+});

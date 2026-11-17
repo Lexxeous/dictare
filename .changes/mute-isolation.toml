@@ -1,3 +1,3 @@
 name = "mute-isolation"
-bump = "patch"
-summary = "Prevent muted speech from triggering new audio feedback."
+bump = "minor"
+summary = "Add strict mute and keep standard mute feedback quiet."

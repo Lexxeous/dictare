@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add a separate strict mute that closes microphone input and audio until the
+  hotkey resumes, while standard mute retains spoken resume.
 - Optionally pause after each prompt for review, with an explicit Send or
   Discard action and the original assistant destination shown on Home.
 - Configure personal mute, resume, and send phrases in Commands; show saved

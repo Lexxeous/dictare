@@ -267,6 +267,18 @@ applies. Resume works after voice mute; use Home or your shortcut to start
 fully stopped listening. Voice mute currently keeps recognition active to hear
 Resume; it does not turn off microphone capture.
 
+## Standard mute and strict mute
+
+Standard voice mute keeps listening for your configured Resume phrase; it
+suppresses normal dictation and its feedback while it waits. To stop microphone
+input and audio instead, choose **Strict mute** on Home. Press your hotkey to
+resume; a working hotkey is required. Strict mute stays active across a normal
+engine restart. If Dictare cannot confirm that audio stopped, Home shows the
+problem instead of claiming silence.
+
+For source development, global hotkeys are disabled to avoid interfering with
+an installed engine. Simulate a tap using `./scripts/dev.sh hotkey`.
+
 ## Review words before sending
 
 In Settings → General, turn on **Review words before sending** and save. After

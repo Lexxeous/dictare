@@ -7,6 +7,7 @@ except the lazy engines-availability cache.
 
 from __future__ import annotations
 
+import os
 import time
 from typing import TYPE_CHECKING
 
@@ -61,6 +62,8 @@ def build_status(engine: DictareEngine) -> dict:
     )
 
     stt_active = stt_state not in ("off", "strict_muted")
+    hotkey_bound = hotkey_active(engine)
+    source_hotkey = os.environ.get("DICTARE_DEV_MODE") == "1"
 
     return {
         # OpenVIP protocol-level fields
@@ -76,6 +79,8 @@ def build_status(engine: DictareEngine) -> dict:
             "state": stt_state,
             "strict_mute_pending": engine._strict_transitioning,
             "strict_mute_error": engine._strict_audio_error,
+            "strict_mute_available": hotkey_bound or source_hotkey,
+            "strict_mute_source_test": source_hotkey,
             "uptime_seconds": uptime,
             "stt": {
                 "model_name": engine.config.stt.model,
@@ -89,7 +94,7 @@ def build_status(engine: DictareEngine) -> dict:
             },
             "hotkey": {
                 "key": engine.config.hotkey.key,
-                "bound": hotkey_active(engine),
+                "bound": hotkey_bound,
                 "status": hotkey_status_raw(engine),
             },
             "tts": {
