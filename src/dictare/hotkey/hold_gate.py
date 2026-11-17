@@ -80,6 +80,11 @@ class HoldGate:
         """Cancel a live gesture on shutdown, mode change or transport failure."""
         return self._finish("cancelled")
 
+    def is_draining(self, generation: int) -> bool:
+        """Check ownership before cleaning up the released turn's resources."""
+        with self._lock:
+            return self._draining and generation == self._generation
+
     def complete(self, generation: int) -> bool:
         """Acknowledge a finished turn; ignore stale acknowledgements."""
         with self._lock:

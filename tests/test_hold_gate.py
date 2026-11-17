@@ -35,8 +35,10 @@ def test_press_release_and_duplicate_events_are_serialized():
         assert not gate.active and timer.cancelled
         assert events == [('start', 1), ('released', 1)]
         assert not gate.press()
+        assert gate.is_draining(1) and not gate.is_draining(99)
         assert not gate.complete(99)
         assert gate.complete(1)
+        assert not gate.is_draining(1)
         assert gate.press()
         assert gate.cancel()
         assert not gate.complete(1)

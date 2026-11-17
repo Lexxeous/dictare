@@ -19,6 +19,7 @@ from dictare.core.events import EngineEvents
 from dictare.core.fsm import (
     AppState,
     DiscardCurrent,
+    HoldCaptureEnded,
     HotkeyPressed,
     SetListening,
     SpeechEnded,
@@ -34,6 +35,7 @@ from dictare.core.status_report import build_status, check_launcher_hash
 from dictare.core.tts_manager import TTSManager
 from dictare.hotkey.base import HotkeyListener
 from dictare.hotkey.factory import create_hotkey_listener
+from dictare.hotkey.hold_gate import HoldEnd, HoldGate
 from dictare.hotkey.tap_detector import TapDetector
 from dictare.pipeline import Pipeline
 from dictare.stt.base import STTEngine
@@ -126,6 +128,8 @@ class DictareEngine:
         events: EngineEvents | None = None,
         logger: JSONLLogger | None = None,
         hotkey_enabled: bool = True,
+        *,
+        experimental_hold: bool = False,
     ) -> None:
         """Initialize the engine.
 
@@ -137,6 +141,10 @@ class DictareEngine:
                            (macOS requires main thread for hotkey events).
         """
         self._hotkey_enabled = hotkey_enabled
+        self._experimental_hold = experimental_hold
+        self._hold_capture_active = False
+        self._hold_capture_generation = 0
+        self._hold_complete_lock = threading.Lock()
         self.config = config
         self._events = events
 
@@ -238,6 +246,12 @@ class DictareEngine:
             on_single_tap=self._single_tap_action,
             on_double_tap=self._double_tap_action,
         )
+
+        self._hold_gate = HoldGate(
+            self._start_hold_capture,
+            self._end_hold_capture,
+            timeout=max(0.5, min(float(config.audio.max_duration), 60.0)),
+        ) if experimental_hold else None
 
         # Initialize components
         self.audio_manager: AudioManager | None = None
@@ -670,8 +684,9 @@ class DictareEngine:
     # -------------------------------------------------------------------------
 
     def _on_max_speech_duration(self) -> None:
-        """Handle max speech duration reached in VAD mode."""
-        pass
+        """Cancel an explicit hold if its VAD duration limit is reached."""
+        if self._hold_capture_active and self._hold_gate:
+            self._hold_gate.cancel()
 
     def _on_vad_speech_start(self) -> None:
         """Handle VAD speech start detection."""
@@ -721,6 +736,7 @@ class DictareEngine:
         """Admit audio only while listening and no review gate is closed."""
         return (
             self._state_manager.should_process_audio
+            and (not self._experimental_hold or self._hold_capture_active)
             and self.capture_allowed()
             and (not self.agent_mode or bool(self.visible_agents))
         )
@@ -1174,21 +1190,61 @@ class DictareEngine:
     # Hotkey Actions
     # -------------------------------------------------------------------------
 
+    def _start_hold_capture(self, generation: int) -> None:
+        """Open admission only after VAD is configured for one explicit turn."""
+        if not self.audio_manager:
+            raise RuntimeError("Audio capture is unavailable")
+        self.audio_manager.set_vad_explicit_turn(True)
+        self._hold_capture_generation = self._capture_generation
+        self._hold_capture_active = True
+        self._controller.send(SetListening(on=True, source="hold"))
+
+    def _end_hold_capture(self, reason: HoldEnd, generation: int) -> None:
+        """Close admission immediately; the controller owns VAD and delivery."""
+        self._hold_capture_active = False
+        self._controller.send(HoldCaptureEnded(
+            cancelled=reason != "released", capture_generation=self._hold_capture_generation,
+            hold_generation=generation, source="hold",
+        ))
+
+    def complete_hold(self, generation: int) -> None:
+        """Reset VAD before allowing another turn; ignore stale acknowledgements."""
+        with self._hold_complete_lock:
+            gate = self._hold_gate
+            if gate and gate.is_draining(generation):
+                if self.audio_manager:
+                    self.audio_manager.set_vad_explicit_turn(False)
+                gate.complete(generation)
+
     def hotkey_tap(self) -> None:
-        """Handle the legacy transport's complete tap event."""
+        """Handle a legacy complete tap; it cannot represent a held shortcut."""
+        if self._experimental_hold:
+            return
         self.tap_detector.on_key_down()
         self.tap_detector.on_key_up()
 
     def hotkey_down(self) -> None:
         """Handle a physical press from a listener or the launcher."""
+        if self._hold_gate:
+            if (not self.running or not self.audio_manager or self.state != AppState.OFF
+                    or self._strict_muted or self._voice_muted or self.review_pending()):
+                return
+            self._hold_gate.press()
+            return
         self.tap_detector.on_key_down()
 
     def hotkey_up(self) -> None:
         """Handle a physical release from a listener or the launcher."""
+        if self._hold_gate:
+            self._hold_gate.release()
+            return
         self.tap_detector.on_key_up()
 
     def hotkey_other_key(self) -> None:
-        """Cancel a tap when the shortcut is part of another key combination."""
+        """Cancel a gesture when the shortcut is part of another combination."""
+        if self._hold_gate:
+            self._hold_gate.cancel()
+            return
         self.tap_detector.on_other_key()
 
     def _hotkey_context(self) -> tuple[str, bool, str | None, bool | None]:
@@ -1352,6 +1408,8 @@ class DictareEngine:
         from dictare.audio.beep import suspend_feedback
         from dictare.tts.base import suspend_native_audio
 
+        if self._hold_gate:
+            self._hold_gate.cancel()
         with self._strict_mute_transition_lock:
             with self._injection_lock:
                 if self.review_pending():
@@ -1937,6 +1995,8 @@ class DictareEngine:
     def stop(self) -> None:
         """Stop the engine."""
         self.running = False
+        if self._hold_gate:
+            self._hold_gate.cancel()
 
         # Ask the STT worker to exit after the current job (daemon thread —
         # best effort, never blocks shutdown)
