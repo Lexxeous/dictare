@@ -79,6 +79,7 @@ def build_status(engine: DictareEngine) -> dict:
             "state": stt_state,
             "strict_mute_pending": engine._strict_transitioning,
             "strict_mute_error": engine._strict_audio_error,
+            "voice_mute_error": engine._voice_mute_error,
             "strict_mute_available": hotkey_bound or source_hotkey,
             "strict_mute_source_test": source_hotkey,
             "uptime_seconds": uptime,

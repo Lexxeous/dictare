@@ -269,6 +269,11 @@ class TestGetStatus:
 class TestMuteUnmute:
     """Test voice mute functionality."""
 
+    @pytest.fixture(autouse=True)
+    def isolate_feedback(self, monkeypatch):
+        monkeypatch.setattr("dictare.audio.beep.suspend_feedback", MagicMock())
+        monkeypatch.setattr("dictare.audio.beep.resume_feedback", MagicMock())
+
     def test_mute_sets_flag(self) -> None:
         engine = DictareEngine(config=MockConfig())
         engine.running = True

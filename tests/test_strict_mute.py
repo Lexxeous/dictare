@@ -207,3 +207,37 @@ def test_strict_mute_availability_requires_hotkey_or_source_mode(monkeypatch):
     platform = engine.get_status()["platform"]
     assert platform["strict_mute_available"] is True
     assert platform["strict_mute_source_test"] is True
+
+
+def test_standard_mute_cannot_reopen_feedback_during_strict_resume(monkeypatch):
+    import threading
+
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine.tts_mgr = MagicMock(available=False)
+    engine._strict_muted = True
+    engine._voice_muted = True
+    entering = threading.Event()
+    release = threading.Event()
+    order = []
+    def resume_feedback():
+        entering.set()
+        assert release.wait(timeout=2)
+        order.append("resume")
+    monkeypatch.setattr("dictare.audio.beep.resume_feedback", resume_feedback)
+    monkeypatch.setattr("dictare.audio.beep.suspend_feedback", lambda **kwargs: order.append("suspend"))
+    resume = threading.Thread(target=engine.resume_strict_mute)
+    mute = threading.Thread(target=engine.mute)
+    try:
+        resume.start()
+        assert entering.wait(timeout=2)
+        mute.start()
+        release.set()
+        resume.join(timeout=2)
+        mute.join(timeout=2)
+        assert order == ["resume", "suspend"]
+        assert engine._voice_muted and not engine._strict_muted
+    finally:
+        release.set()
+        resume.join(timeout=2)
+        if mute.ident is not None:
+            mute.join(timeout=2)

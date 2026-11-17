@@ -217,6 +217,7 @@ class DictareEngine:
         # Voice muted flag — when True, MuteFilter discards all text
         # except listen triggers. Engine stays in LISTENING (VAD+STT active).
         self._voice_muted = False
+        self._voice_mute_error: str | None = None
         # Separate from standard voice mute; not yet exposed in the UI.
         self._strict_muted = False
         self._strict_audio_error: str | None = None
@@ -1295,31 +1296,29 @@ class DictareEngine:
     # -------------------------------------------------------------------------
 
     def mute(self) -> None:
-        """Mute voice input (idempotent).
-
-        Engine stays in LISTENING — VAD+STT keep running so MuteFilter
-        can detect the listen trigger. All other text is discarded.
-        Plays a random TTS mute phrase.
-        """
-        if self._voice_muted or self._strict_muted:
-            return
-        self._voice_muted = True
-        logger.info("voice_muted")
-
-        # TTS feedback
+        """Mute dictation while keeping recognition available for voice resume."""
         import random
-        phrases = self.config.pipeline.mute_filter.mute_phrases
-        if phrases and self.tts_mgr.available:
-            phrase = random.choice(phrases)  # noqa: S311
-            self.tts_mgr.speak_text(phrase)
 
+        from dictare.audio.beep import suspend_feedback
+
+        with self._injection_lock:
+            if self._voice_muted or self._strict_muted:
+                return
+            self._voice_muted = True
+            self._voice_mute_error = None
+            logger.info("voice_muted")
+            try:
+                suspend_feedback(stop_active=self.audio_manager is not None)
+            except Exception:
+                self._voice_mute_error = "Could not stop feedback audio."
+                logger.exception("Could not stop muted feedback output")
+            phrases = self.config.pipeline.mute_filter.mute_phrases
+            if phrases and self.tts_mgr.available:
+                self.speak_text(random.choice(phrases))  # noqa: S311
         self._notify_status()
 
     def strict_mute(self) -> bool:
-        """Gate capture and close input; the physical hotkey resumes it.
-
-        Kept internal until queued audio and TTS cancellation are implemented.
-        """
+        """Gate capture and close input; the physical hotkey resumes it."""
         from dictare.audio.beep import suspend_feedback
         from dictare.tts.base import suspend_native_audio
 
@@ -1374,44 +1373,43 @@ class DictareEngine:
                     self._strict_audio_error = "Could not reopen the microphone input."
                     logger.exception("Could not reopen strict-muted input")
                     return
+            from dictare.audio.beep import resume_feedback
+            from dictare.tts.base import resume_native_audio
+
             with self._injection_lock:
                 pending = self.review_pending()
                 if not pending:
                     self.discard_current_internal()
+                    resume_native_audio()
+                    resume_feedback()
+                    self.tts_mgr.resume_after_strict()
                     self._strict_muted = False
                     self._strict_audio_error = None
                     self._voice_muted = False
+                    self._voice_mute_error = None
                     self._controller.send(SetListening(on=True, source="strict_resume"))
             if pending:
                 if self.audio_manager:
                     self.audio_manager.suspend_input()
                 return
-            from dictare.audio.beep import resume_feedback
-            from dictare.tts.base import resume_native_audio
-
-            resume_native_audio()
-            resume_feedback()
-            self.tts_mgr.resume_after_strict()
             self._notify_status()
 
     def unmute(self) -> None:
-        """Unmute voice input (idempotent).
-
-        Resumes normal text flow through the pipeline.
-        Plays a random TTS listen phrase.
-        """
-        if not self._voice_muted or self._strict_muted:
-            return
-        self._voice_muted = False
-        logger.info("voice_unmuted")
-
-        # TTS feedback
+        """Resume standard voice mute; strict mute requires the hotkey."""
         import random
-        phrases = self.config.pipeline.mute_filter.listen_phrases
-        if phrases and self.tts_mgr.available:
-            phrase = random.choice(phrases)  # noqa: S311
-            self.tts_mgr.speak_text(phrase)
 
+        from dictare.audio.beep import resume_feedback
+
+        with self._injection_lock:
+            if not self._voice_muted or self._strict_muted:
+                return
+            self._voice_muted = False
+            self._voice_mute_error = None
+            logger.info("voice_unmuted")
+            resume_feedback()
+            phrases = self.config.pipeline.mute_filter.listen_phrases
+            if phrases and self.tts_mgr.available:
+                self.speak_text(random.choice(phrases))  # noqa: S311
         self._notify_status()
 
     # -------------------------------------------------------------------------
@@ -1806,6 +1804,10 @@ class DictareEngine:
 
             if suspend_native_audio() is False:
                 self._strict_audio_error = "Could not confirm speech playback stopped."
+            suspend_feedback(stop_active=False)
+        elif self._voice_muted:
+            from dictare.audio.beep import suspend_feedback
+
             suspend_feedback(stop_active=False)
 
         # Start audio streaming (always needed for VAD to work)
