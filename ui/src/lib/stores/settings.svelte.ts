@@ -1,4 +1,4 @@
-import { fetchSchema, saveSetting, saveTomlSection, saveShortcuts, selectCapability, restartEngine, type Shortcut, type StatusResponse } from "$lib/api";
+import { fetchSchema, saveSettings, saveTomlSection, saveShortcuts, selectCapability, restartEngine, type Shortcut, type StatusResponse } from "$lib/api";
 import type { SchemaResponse } from "$lib/types";
 
 let schema = $state<SchemaResponse | null>(null);
@@ -211,11 +211,11 @@ export async function saveAll(): Promise<void> {
 	let errorCount = 0;
 
 	// Save form fields
-	for (const [key, value] of Object.entries(dirty)) {
+	if (Object.keys(dirty).length) {
 		try {
-			await saveSetting(key, value);
+			await saveSettings(dirty);
 		} catch (e) {
-			errors[key] = (e as Error).message;
+			errors.settings = (e as Error).message;
 			errorCount++;
 		}
 	}

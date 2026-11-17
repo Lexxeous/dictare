@@ -709,123 +709,80 @@ def _stamp_version(doc: Any) -> None:
 
     doc["_version"] = f"dictare/{__version__}"
 
-def set_config_value(key: str, value: str, config_path: Path | None = None) -> None:
-    """Set a config value by dot-notation key.
+def set_config_values(updates: dict[str, str | None], config_path: Path | None = None) -> None:
+    """Validate form changes together, then replace one comment-preserving TOML file.
 
-    Uses tomlkit to preserve comments and formatting.
-
-    Args:
-        key: Dot-notation key like 'stt.model' or 'log_level'
-        value: String value (will be converted to appropriate type)
-        config_path: Path to config file (uses default if None)
-
-    Raises:
-        KeyError: If key not found
+    None removes a key and restores its schema default. This transaction covers
+    form values only, not model downloads or separately edited TOML sections.
     """
+    import stat
+    import tempfile
+
     import tomlkit
 
-    if config_path is None:
-        config_path = get_config_path()
-
-    # Validate the key exists in the schema
-    config = load_config(config_path)
-    config_dict = config.model_dump()
-
-    parts = key.split(".")
-
-    if len(parts) == 1:
-        if parts[0] not in config_dict:
+    if not updates:
+        return
+    config_path = (config_path or get_config_path()).resolve()
+    config_dict = load_config(config_path).model_dump()
+    defaults = Config().model_dump()
+    doc = tomlkit.parse(config_path.read_text(encoding="utf-8")) if config_path.exists() else tomlkit.document()
+    for key, value in updates.items():
+        parts = key.split(".")
+        if len(parts) == 1 and parts[0] in config_dict:
+            current = config_dict[parts[0]]
+        elif len(parts) == 2 and isinstance(config_dict.get(parts[0]), dict) and parts[1] in config_dict[parts[0]]:
+            current = config_dict[parts[0]][parts[1]]
+        else:
             raise KeyError(f"Unknown config key: {key}")
-        current_value = config_dict[parts[0]]
-    elif len(parts) == 2:
-        section, field = parts
-        if section not in config_dict or not isinstance(config_dict[section], dict):
-            raise KeyError(f"Unknown config section: {section}")
-        if field not in config_dict[section]:
-            raise KeyError(f"Unknown config key: {key}")
-        current_value = config_dict[section][field]
-    else:
-        raise KeyError(f"Invalid config key format: {key}")
-
-    parsed = _parse_value(value, type(current_value) if current_value is not None else str)
-
-    # Validate the new value
-    test_dict = config_dict.copy()
-    if len(parts) == 1:
-        test_dict[parts[0]] = parsed
-    else:
-        test_dict[parts[0]] = {**test_dict[parts[0]], parts[1]: parsed}
-    Config.model_validate(test_dict)
-
-    # Read file with tomlkit (preserves comments and formatting)
-    if config_path.exists():
-        doc = tomlkit.parse(config_path.read_text(encoding="utf-8"))
-    else:
-        doc = tomlkit.document()
-
-    # Set the value
-    if len(parts) == 1:
-        doc[parts[0]] = parsed
-    else:
-        section, field = parts
-        if section not in doc:
-            doc.add(section, tomlkit.table())
-        doc[section][field] = parsed  # type: ignore[index]
-
-    # Stamp version for future config migration
+        parsed = _parse_value(value, type(current) if current is not None else str) if value is not None else None
+        if len(parts) == 1:
+            config_dict[key] = defaults[key] if value is None else parsed
+            if value is None:
+                doc.pop(key, None)
+            else:
+                doc[key] = parsed
+        else:
+            section, field = parts
+            config_dict[section][field] = defaults[section][field] if value is None else parsed
+            if value is None:
+                table = doc.get(section)
+                if isinstance(table, dict):
+                    table.pop(field, None)
+            else:
+                if section not in doc:
+                    doc.add(section, tomlkit.table())
+                table = doc[section]
+                if not isinstance(table, dict):
+                    raise ValueError(f"Config section is not a table: {section}")
+                table[field] = parsed
+    Config.model_validate(config_dict)
+    if not config_path.exists() and all(value is None for value in updates.values()):
+        return
     _stamp_version(doc)
-
-    # Write back (preserves all comments and formatting)
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=config_path.parent, prefix=f".{config_path.name}.", suffix=".tmp", delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(tomlkit.dumps(doc))
+            stream.flush()
+            os.fsync(stream.fileno())
+        if config_path.exists():
+            temporary.chmod(stat.S_IMODE(config_path.stat().st_mode))
+        os.replace(temporary, config_path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def set_config_value(key: str, value: str, config_path: Path | None = None) -> None:
+    """Set one validated config value, preserving comments and formatting."""
+    set_config_values({key: value}, config_path)
+
 
 def delete_config_value(key: str, config_path: Path | None = None) -> None:
-    """Remove a config key from the TOML file, reverting to the Pydantic default.
-
-    Args:
-        key: Dot-notation key like 'stt.model' or 'log_level'
-        config_path: Path to config file (uses default if None)
-
-    Raises:
-        KeyError: If key is not a valid schema key
-    """
-    import tomlkit
-
-    if config_path is None:
-        config_path = get_config_path()
-
-    # Validate the key exists in the schema
-    config = load_config(config_path)
-    config_dict = config.model_dump()
-
-    parts = key.split(".")
-    if len(parts) == 1:
-        if parts[0] not in config_dict:
-            raise KeyError(f"Unknown config key: {key}")
-    elif len(parts) == 2:
-        section, field = parts
-        if section not in config_dict or not isinstance(config_dict[section], dict):
-            raise KeyError(f"Unknown config section: {section}")
-        if field not in config_dict[section]:
-            raise KeyError(f"Unknown config key: {key}")
-    else:
-        raise KeyError(f"Invalid config key format: {key}")
-
-    if not config_path.exists():
-        return  # Nothing to delete
-
-    doc = tomlkit.parse(config_path.read_text(encoding="utf-8"))
-    if len(parts) == 1:
-        if parts[0] in doc:
-            del doc[parts[0]]
-    else:
-        section, field = parts
-        tbl = doc.get(section)
-        if isinstance(tbl, dict) and field in tbl:
-            del tbl[field]
-
-    _stamp_version(doc)
-    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    """Remove a schema key, restoring its default without rewriting other keys."""
+    set_config_values({key: None}, config_path)
 
 def list_config_keys() -> list[tuple[str, str, Any, str, str]]:
     """List all config keys with their descriptions and defaults.

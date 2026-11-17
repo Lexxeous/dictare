@@ -30,6 +30,11 @@ native launcher/hotkey changes need their own platform-specific check.
 Run setup again after pulling UI dependency changes; the source UI runner
 checks the installed lockfile before launching or building.
 
+An isolated worktree can reuse a compatible contributor environment by setting
+`DICTARE_DEV_PYTHON` to that checkout's `.venv/bin/python`. The helper still
+imports the selected worktree's source and uses its separate `.dictare-dev/`
+state and explicit ports; it never invokes the installed `dictare` command.
+
 On Apple Silicon, add `--extra mlx` if you need the MLX speech stack. UI work
 also requires pnpm dependencies in `ui/`.
 

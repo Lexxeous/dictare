@@ -1,0 +1,3 @@
+name = "atomic-settings"
+bump = "patch"
+summary = "Provide validated form batches and reusable source worktree Python selection."
