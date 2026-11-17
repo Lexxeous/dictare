@@ -241,7 +241,8 @@ sidebar. Choose light, system, or dark appearance under General settings.
 
 **Documentation** displays the README included with your installed copy as
 rendered Markdown. Reading it does not require GitHub or an internet connection;
-external links open separately. Remote badges and images appear as descriptions
+use the copy icon on a code block to copy its contents. External links open separately.
+Remote badges and images appear as descriptions
 to avoid loading external resources. Home keeps everyday guidance separate
 from the README's installation and developer reference.
 

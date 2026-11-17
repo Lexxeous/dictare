@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { setListening, listeningLabel, hotkeyLabel } from "../src/lib/listening.ts";
-import { renderDocumentation } from "../src/lib/documentation.ts";
+import { copyDocumentationCode, renderDocumentation } from "../src/lib/documentation.ts";
 
 test("listening controls use explicit speech commands, never shutdown", async (t) => {
 	const calls = [];
@@ -35,6 +35,23 @@ test("README Markdown includes headings, tables, lists and escaped code", () => 
 	assert.match(html, /<table>/);
 	assert.match(html, /<li>Speak<\/li>/);
 	assert.match(html, /&lt;script&gt;example/);
+});
+
+test("fenced and indented code blocks each offer a copy control", () => {
+	const html = renderDocumentation("```sh\necho '<hello>'\n```\n\n    indented command\n");
+	assert.equal((html.match(/data-copy-code/g) ?? []).length, 2);
+	assert.match(html, /echo '&lt;hello&gt;'/);
+	assert.match(html, /indented command/);
+});
+
+test("copy preserves code exactly and reports clipboard errors", async () => {
+	let copied = "";
+	assert.equal(await copyDocumentationCode("  echo hello\n", { writeText: async (value) => { copied = value; } }), true);
+	assert.equal(copied, "  echo hello\n");
+	assert.equal(await copyDocumentationCode("hello", undefined), false);
+	assert.equal(await copyDocumentationCode("hello", { writeText: async () => { throw new Error("denied"); } }), false);
+	assert.equal(await copyDocumentationCode("fallback text", undefined, (value) => value === "fallback text"), true);
+	assert.equal(await copyDocumentationCode("hello", { writeText: async () => { throw new Error("denied"); } }, () => true), true);
 });
 
 test("raw HTML, unsafe URLs and remote image loads are excluded", () => {

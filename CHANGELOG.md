@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guidance and explicit handling of unconfirmed shutdown requests.
 
 ### Fixed
+- Wrap the sidebar version label and remove its divider while collapsed. Add
+  one-click copy controls to the bundled documentation's code blocks.
 - Make desktop navigation collapsible, widen settings content, move appearance
   controls to General, and place whole-engine shutdown at the bottom of Home.
 - Use Dictare examples for personal voice commands throughout the project.

@@ -84,7 +84,7 @@
 	}}
 />
 
-<nav bind:this={navigation} aria-label="Settings navigation" style="--settings-bottom: {getFixedBottomPx()}px" class="relative z-30 w-full {desktopCollapsed ? 'sm:w-16' : 'sm:w-52'} shrink-0 border-b sm:border-b-0 sm:border-r bg-background sm:bg-background/50 sm:h-screen sm:overflow-y-auto p-3 flex flex-col">
+<nav bind:this={navigation} aria-label="Settings navigation" style="--settings-bottom: {getFixedBottomPx()}px" class="relative z-30 w-full {desktopCollapsed ? 'sm:w-16 sm:border-r-0' : 'sm:w-52 sm:border-r'} shrink-0 border-b sm:border-b-0 bg-background sm:bg-background/50 sm:h-screen sm:overflow-y-auto p-3 flex flex-col">
 	<div class="flex items-center justify-between gap-2">
 		<button aria-label="Dictare Home" onclick={() => selectLeaf("home")} class="{desktopCollapsed ? 'sm:hidden' : ''} min-w-0 flex-1 px-3 py-2 text-left rounded-md focus-visible:ring-2 focus-visible:ring-ring">
 			<span class="flex items-center gap-2">
@@ -100,7 +100,7 @@
 				<span class="text-sm font-semibold tracking-tight">DICTA<span style="color: #6d5ce6">re</span></span>
 			</span>
 			{#if version}
-				<span title={version} class="mt-1 block truncate text-[11px] text-muted-foreground">{version}</span>
+				<span title={version} class="mt-1 block break-all whitespace-normal text-[11px] text-muted-foreground">{version}</span>
 			{/if}
 		</button>
 		<button bind:this={menuButton} class="sm:hidden shrink-0 flex size-10 items-center justify-center rounded-md border focus-visible:ring-2 focus-visible:ring-ring" aria-label={mobileOpen ? "Close settings menu" : "Open settings menu"} aria-expanded={mobileOpen} aria-controls="settings-pages" onclick={() => mobileOpen = !mobileOpen}>
