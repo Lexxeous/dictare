@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Show profile/continuation options in agent help and explain nested service help.
+
 ### Development
 - Calculate release targets from pending change intent and current main tags;
   validate publishing from main and identify source runs with distinct dev labels.

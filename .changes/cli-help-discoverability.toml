@@ -1,0 +1,3 @@
+name = "cli-help-discoverability"
+bump = "patch"
+summary = "Expose nested service commands and agent options in CLI help."

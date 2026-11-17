@@ -21,6 +21,17 @@ class TestCLIBasics:
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
         assert "dictare" in result.stdout.lower()
+        root_help = " ".join(result.stdout.split())
+        assert "dictare service --help" in root_help
+        assert "dictare service stop" in root_help
+
+    def test_agent_help_lists_profile_and_resume_options(self) -> None:
+        """Agent-specific controls should be discoverable with --help."""
+        result = runner.invoke(app, ["agent", "--help"])
+        assert result.exit_code == 0
+        assert "--profile" in result.stdout
+        assert "--continue" in result.stdout
+        assert "resume" in result.stdout
 
     def test_config_help(self) -> None:
         """Test 'config --help' shows config command help."""
@@ -154,6 +165,23 @@ class TestAgentContinue:
         result, captured = self._invoke_agent(["myproject", "--type", "sonnet", "-C"], cfg)
         assert result.exit_code == 0
         assert captured == [["claude", "-c", "--model", "claude-sonnet-4-6"]]
+
+    def test_declared_options_before_agent_name(self) -> None:
+        """Help-visible options work before the positional session name."""
+        cfg = self._make_config(continue_args=["-c"])
+        result, captured = self._invoke_agent(
+            ["--profile", "sonnet", "--continue", "myproject"], cfg
+        )
+        assert result.exit_code == 0
+        assert captured == [["claude", "-c", "--model", "claude-sonnet-4-6"]]
+
+    def test_child_options_after_separator_are_preserved(self) -> None:
+        """Child flags with Dictare option names must remain child arguments."""
+        cfg = self._make_config()
+        command = ["custom-agent", "--profile", "custom", "--continue"]
+        result, captured = self._invoke_agent(["myproject", "--"] + command, cfg)
+        assert result.exit_code == 0
+        assert captured == [command]
 
     def test_continue_without_continue_args_warns(self) -> None:
         """--continue with no continue_args configured shows a warning."""
