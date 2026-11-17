@@ -36,6 +36,10 @@ from dictare.config import ConfigError
 app = typer.Typer(
     name="dictare",
     help="Voice-first control for AI coding agents",
+    epilog=(
+        "Command groups contain additional commands. Run `dictare service "
+        "--help` to see all of them, including `dictare service stop`."
+    ),
     add_completion=True,  # Required for shell completion to work at runtime
     no_args_is_help=True,
     pretty_exceptions_enable=False,

@@ -108,6 +108,10 @@ dictare agent gilmour --profile gemini  # Google Gemini CLI
 dictare agent bowie --profile aider     # Aider
 ```
 
+To discover options, run `dictare --help`. Command groups have their own
+help: `dictare service --help` lists commands such as `stop`, and
+`dictare agent --help` lists agent options.
+
 ## How It Works
 
 ```
@@ -196,6 +200,8 @@ Default hotkey: **Right ⌘** (macOS) / **Scroll Lock** (Linux).
 | **Right Alt + hotkey** | Switch mode: agents ↔ keyboard |
 
 ## Service Management
+
+Run `dictare service --help` to see the complete service command list.
 
 ```bash
 dictare upgrade             # Install latest runtime and switch atomically

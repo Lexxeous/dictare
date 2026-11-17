@@ -49,6 +49,24 @@ def register(app: typer.Typer) -> None:
             str | None,
             typer.Argument(help="Agent session name — identifies this instance (e.g., 'frontend', 'Pippo')"),
         ] = None,
+        profile_option: Annotated[
+            str | None,
+            typer.Option(
+                "--profile", "--type", "-t",
+                help="Agent profile from [agent_profiles] in config.toml.",
+            ),
+        ] = None,
+        continue_option: Annotated[
+            bool,
+            typer.Option("--continue", "-C", help="Resume this named agent session."),
+        ] = False,
+        live_dangerously_option: Annotated[
+            bool,
+            typer.Option(
+                "--live-dangerously",
+                help="Use the profile's configured permission-bypass arguments.",
+            ),
+        ] = False,
         verbose: Annotated[
             bool,
             typer.Option("--verbose", "-v", help="Verbose agent logging and full text in session file"),
@@ -63,6 +81,8 @@ def register(app: typer.Typer) -> None:
         AGENT_ID is the session name (project, role, etc.) — not the model profile.
         Use --profile to pick which agent_profiles template to run. Without --profile,
         default agent profile from config is used.
+
+        Use --continue to resume the named session.
 
         Examples:
 
@@ -106,9 +126,9 @@ def register(app: typer.Typer) -> None:
         # Parse extra args: extract own flags and command override
         args = list(ctx.args)
         own_flags_to_remove: set[int] = set()
-        agent_profile_name: str | None = None
-        continue_session: bool = False
-        live_dangerously: bool = False
+        agent_profile_name = profile_option
+        continue_session = continue_option
+        live_dangerously = live_dangerously_option
         has_double_dash = False  # tracks whether '--' separator was used
         for i, arg in enumerate(args):
             if arg in ("--verbose", "-v"):
@@ -131,6 +151,7 @@ def register(app: typer.Typer) -> None:
             elif arg == "--":
                 has_double_dash = True
                 own_flags_to_remove.add(i)
+                break  # All remaining arguments belong to the child command.
 
         command_override = [arg for i, arg in enumerate(args) if i not in own_flags_to_remove]
 

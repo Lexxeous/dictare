@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Show profile/continuation options in agent help and explain nested service help.
+
 ### Development
 - Define one immediate feature branch per local request, complexity-ordered
   implementation, validated checkpoint commits, and build/runner review.
