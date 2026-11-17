@@ -38,6 +38,9 @@ Keep local checkouts under the ignored `.worktrees/<name>/` directory inside
 this repository. Checkout-specific helpers and logs belong in that checkout's
 `.dictare-dev/checks/` and `.dictare-dev/logs/`, respectively. Keep the container
 free of loose scripts and logs; use `git worktree move` when relocating.
+Use `./scripts/dev.sh hotkey` to simulate one hotkey tap in the source engine
+when testing shortcut-dependent behavior. This is a loopback-only development
+route; it does not register a global shortcut or control the installed engine.
 The source serve/stack runners honor Dictare's restart exit code after settings
 changes. Normal shutdown exits; Ctrl+C stops only their owned engine/UI process
 groups, including child processes, without managing the installed service.

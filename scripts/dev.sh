@@ -22,6 +22,7 @@ Usage: ./scripts/dev.sh
   stack               Run the local engine and UI together
   listen              Start listening on the local engine
   pause               Stop listening on the local engine
+  hotkey              Simulate one source hotkey tap (no global shortcut)
   test [PYTEST_ARGS…] Run the repository tests
   lint                Run Ruff on source and tests
   typecheck           Run mypy on source
@@ -158,9 +159,10 @@ import sys
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+is_hotkey = sys.argv[2] == "dev.hotkey"
 request = Request(
-    sys.argv[1] + "/openvip/control",
-    data=json.dumps({"command": sys.argv[2]}).encode(),
+    sys.argv[1] + ("/api/dev/hotkey" if is_hotkey else "/openvip/control"),
+    data=json.dumps({} if is_hotkey else {"command": sys.argv[2]}).encode(),
     headers={"Content-Type": "application/json"},
 )
 try:
@@ -209,6 +211,10 @@ case "$command_name" in
     stack)
         [[ $# -eq 0 ]] || error "The stack command does not accept extra arguments. Set DICTARE_DEV_API_PORT or DICTARE_DEV_UI_PORT to change ports."
         run_stack
+        ;;
+    hotkey)
+        [[ $# -eq 0 ]] || error "The hotkey command does not accept arguments."
+        set_local_listening dev.hotkey
         ;;
     listen|pause)
         [[ $# -eq 0 ]] || error "The $command_name command does not accept extra arguments."

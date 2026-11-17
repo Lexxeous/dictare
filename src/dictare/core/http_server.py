@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import threading
 from typing import TYPE_CHECKING, Any
 
@@ -152,6 +153,10 @@ class OpenVIPServer:
         )
         register_openvip_routes(app, self)
         register_review_routes(app, self)
+        if os.environ.get("DICTARE_DEV_MODE") == "1":
+            from dictare.core.http_routes_development import register_development_routes
+
+            register_development_routes(app, self)
         register_settings_routes(app, self)
         register_models_routes(app, self)
         return app
