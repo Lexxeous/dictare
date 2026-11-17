@@ -357,3 +357,30 @@ class TestRegisterAgentPreferred:
         agent.id = "claude"
         engine.register_agent(agent)
         assert engine._agent_mgr._current_agent_id == "claude"
+
+
+def test_strict_mute_persists_even_when_other_session_data_expires(state_dir: Path) -> None:
+    save_state(active_agent="old-agent", listening=True, strict_muted=True)
+    path = state_dir / "session-state.json"
+    data = json.loads(path.read_text())
+    data["last_active"] = 1
+    path.write_text(json.dumps(data))
+    loaded = load_state()
+    assert loaded is not None
+    assert loaded["strict_muted"] is True
+    assert loaded["listening"] is False
+    assert loaded["active_agent"] is None
+    engine = _make_engine()
+    assert engine.restore_state(start_listening=True) is False
+    assert engine._strict_muted is True
+    assert not engine.capture_allowed()
+
+
+def test_strict_mute_round_trips_from_engine(state_dir: Path) -> None:
+    engine = _make_engine()
+    engine.running = True
+    engine._strict_muted = True
+    engine.save_state()
+    restored = _make_engine()
+    assert restored.restore_state(start_listening=True) is False
+    assert restored._strict_muted is True

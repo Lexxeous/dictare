@@ -303,6 +303,7 @@ class DictareEngine:
             listening=self.is_listening,
             focused_agent=self._feedback_policy.focused_agent,
             voice_muted=self._voice_muted,
+            strict_muted=self._strict_muted,
         )
 
     def save_session_before_shutdown(self) -> None:
@@ -314,6 +315,7 @@ class DictareEngine:
             listening=self.is_listening,
             focused_agent=self._feedback_policy.focused_agent,
             voice_muted=self._voice_muted,
+            strict_muted=self._strict_muted,
         )
         logger.info(
             "session_saved: agent=%r, mode=%s, listening=%r",
@@ -343,6 +345,7 @@ class DictareEngine:
         saved_listening = saved.get("listening", False)
         saved_focus = saved.get("focused_agent")
         saved_muted = saved.get("voice_muted", False)
+        saved_strict_muted = saved.get("strict_muted") is True
 
         logger.info("restore_state: fresh session → agent=%r, listening=%r, focused=%r, muted=%r", saved_agent, saved_listening, saved_focus, saved_muted)
 
@@ -352,8 +355,9 @@ class DictareEngine:
             self._feedback_policy.set_focus(saved_focus, True)
 
         self._voice_muted = saved_muted
+        self._strict_muted = saved_strict_muted
 
-        return saved_listening
+        return False if saved_strict_muted else saved_listening
 
     # -------------------------------------------------------------------------
     # Properties
@@ -1731,7 +1735,7 @@ class DictareEngine:
         if _audio_ms > 500:
             logger.warning("start_runtime: start_streaming took %.0fms", _audio_ms)
 
-        if start_listening:
+        if start_listening and not self._strict_muted:
             old_state = self.state
             self._state_manager.transition(AppState.LISTENING)
             logger.info("start_runtime: transitioned %s → LISTENING", old_state.name)

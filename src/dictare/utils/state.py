@@ -39,6 +39,7 @@ def save_state(
     listening: bool = False,
     focused_agent: str | None = None,
     voice_muted: bool = False,
+    strict_muted: bool = False,
 ) -> None:
     """Save engine state to disk with a timestamp."""
     path = _state_path()
@@ -47,6 +48,7 @@ def save_state(
         "listening": listening,
         "last_active": time.time(),
         "voice_muted": voice_muted,
+        "strict_muted": strict_muted,
     }
     if focused_agent is not None:
         data["focused_agent"] = focused_agent
@@ -96,6 +98,10 @@ def load_state() -> dict[str, Any] | None:
     # Check session expiry
     last_active = data.get("last_active", 0)
     elapsed = time.time() - last_active
+    if elapsed > SESSION_TIMEOUT_S and data.get("strict_muted") is True:
+        # Privacy must not silently expire with a stale assistant session.
+        return {"active_agent": None, "listening": False, "focused_agent": None,
+                "voice_muted": False, "strict_muted": True}
     if elapsed > SESSION_TIMEOUT_S:
         logger.info(
             "Session expired (%.0f min ago > %d min limit), using config defaults",
@@ -109,6 +115,7 @@ def load_state() -> dict[str, Any] | None:
         "listening": data.get("listening", False),
         "focused_agent": data.get("focused_agent"),
         "voice_muted": data.get("voice_muted", False),
+        "strict_muted": data.get("strict_muted") is True,
     }
 
 def clear_state() -> None:
