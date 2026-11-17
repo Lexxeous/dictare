@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guidance and explicit handling of unconfirmed shutdown requests.
 
 ### Fixed
+- Avoid terminating TTS workers belonging to other Dictare instances at startup.
 - Suppress new transcription and agent-switch feedback while voice-muted and
   keep its status steady during background speech.
 - Omit transcript previews and recognized command text from normal session and

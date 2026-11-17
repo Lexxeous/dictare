@@ -1,0 +1,3 @@
+name = "tts-worker-isolation"
+bump = "patch"
+summary = "Preserve other Dictare instances when starting a TTS worker."

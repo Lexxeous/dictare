@@ -73,6 +73,18 @@ def _post_completion(
     except Exception:
         logger.warning("Failed to post TTS completion for %s", message_id, exc_info=True)
 
+def _watch_parent(parent_pid: int) -> None:
+    """Exit only this worker if the engine that spawned it disappears."""
+    import time
+
+    from dictare.tts.base import stop_audio_native
+
+    while os.getppid() == parent_pid:
+        time.sleep(0.5)
+    stop_audio_native()
+    os._exit(0)
+
+
 def _acknowledge_interruption(url: str, token: str) -> None:
     """Wait for all tracked players to stop before acknowledging a mute."""
     from dictare.tts.base import stop_audio_native
@@ -128,6 +140,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Dictare TTS worker")
     parser.add_argument("--url", default="http://localhost:8770", help="Dictare engine base URL")
     parser.add_argument("--token", default="", help=argparse.SUPPRESS)
+    parser.add_argument("--parent-pid", type=int, default=0, help=argparse.SUPPRESS)
     parser.add_argument("--engine", required=True, help="TTS engine name")
     parser.add_argument("--language", default="en", help="Language code")
     parser.add_argument("--voice", default="", help="Voice name")
@@ -139,6 +152,11 @@ def main(argv: list[str] | None = None) -> None:
 
     import threading
 
+    if args.parent_pid > 0:
+        threading.Thread(
+            target=_watch_parent, args=(args.parent_pid,), daemon=True,
+            name="tts-parent-watch",
+        ).start()
     threading.Thread(
         target=_interrupt_ack_loop, args=(args.url, token), daemon=True,
         name="tts-interrupt-ack",

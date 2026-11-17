@@ -177,7 +177,6 @@ def test_spawn_worker_uses_venv_python():
         patch("dictare.tts.venv.get_venv_python", return_value=fake_venv_python),
         patch("dictare.tts.venv.get_worker_pythonpath", return_value=fake_src_path),
         patch("subprocess.Popen") as mock_popen,
-        patch("dictare.core.tts_manager.TTSManager.kill_orphaned_workers"),
     ):
         mock_proc = MagicMock()
         mock_proc.poll.return_value = None
@@ -192,6 +191,7 @@ def test_spawn_worker_uses_venv_python():
         popen_call = mock_popen.call_args
         cmd = popen_call[0][0]
         assert cmd[0] == fake_venv_python
+        assert int(cmd[cmd.index("--parent-pid") + 1]) == __import__("os").getpid()
 
         # Verify PYTHONPATH and COQUI_TOS_AGREED were set in env
         env = popen_call[1].get("env")
@@ -225,7 +225,6 @@ def test_spawn_worker_uses_sys_executable_without_venv(monkeypatch, pythonpath):
 
     with (
         patch("subprocess.Popen") as mock_popen,
-        patch("dictare.core.tts_manager.TTSManager.kill_orphaned_workers"),
     ):
         mock_proc = MagicMock()
         mock_proc.poll.return_value = None
@@ -273,3 +272,42 @@ def test_venv_engines_registry():
         assert len(packages) > 0
         for pkg in packages:
             assert isinstance(pkg, str)
+
+
+def test_starting_tts_worker_does_not_scan_or_signal_other_instances(monkeypatch):
+    """A source engine may coexist with the installed engine's worker."""
+    from dictare.core.tts_manager import TTSManager
+
+    config = MagicMock()
+    config.tts.engine = "espeak"
+    config.tts.language = "en"
+    config.tts.speed = 175
+    config.tts.voice = ""
+    server = MagicMock()
+    server.port = 18770
+    server.is_tts_connected.return_value = True
+    process = MagicMock()
+    monkeypatch.setattr("dictare.tts.venv.get_venv_python", lambda engine: None)
+    with (patch("subprocess.Popen", return_value=process),
+          patch("subprocess.run") as scan,
+          patch("os.kill") as kill):
+        manager = TTSManager(config)
+        manager._spawn_worker(server)
+        scan.assert_not_called()
+        kill.assert_not_called()
+        assert manager._tts_worker_process is process
+
+
+def test_worker_exits_when_its_own_parent_disappears(monkeypatch):
+    from dictare.tts import worker
+
+    parents = iter([123, 1])
+    monkeypatch.setattr(worker.os, "getppid", lambda: next(parents))
+    monkeypatch.setattr("time.sleep", lambda seconds: None)
+    exit_worker = MagicMock()
+    stop_audio = MagicMock()
+    monkeypatch.setattr(worker.os, "_exit", exit_worker)
+    monkeypatch.setattr("dictare.tts.base.stop_audio_native", stop_audio)
+    worker._watch_parent(123)
+    stop_audio.assert_called_once()
+    exit_worker.assert_called_once_with(0)
