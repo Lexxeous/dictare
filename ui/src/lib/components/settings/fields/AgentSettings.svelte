@@ -49,6 +49,10 @@
 		if (dirty && field in dirty) return dirty[field];
 		return (profiles[name] as Record<string, unknown> | undefined)?.[field];
 	}
+	function invalidCommand(name: string): boolean {
+		const value = profileValue(name, "command");
+		return !Array.isArray(value) || !value.length || typeof value[0] !== "string" || !value[0].trim();
+	}
 	function listValue(name: string, field: string): string {
 		const value = profileValue(name, field);
 		return Array.isArray(value) ? value.join("\n") : "";
@@ -93,6 +97,9 @@
 								value={listValue(option.value, field)}
 								oninput={(event) => settingsStore.markProfileDirty(option.value, field, event.currentTarget.value === "" ? [] : event.currentTarget.value.split("\n"))}></textarea>
 						</label>
+						{#if field === "command" && invalidCommand(option.value)}
+							<p role="alert" class="text-xs text-destructive">Enter an executable on the first line.</p>
+						{/if}
 					{/each}
 					<p class="text-xs text-muted-foreground">Enter one command or argument per line. Arguments are passed directly, without a shell.</p>
 					<div class="flex items-center justify-between gap-4">
