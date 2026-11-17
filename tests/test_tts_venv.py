@@ -202,9 +202,15 @@ def test_spawn_worker_uses_venv_python():
         assert "--token" not in cmd
         assert mgr.auth_token not in " ".join(cmd)
 
-def test_spawn_worker_uses_sys_executable_without_venv():
+@pytest.mark.parametrize("pythonpath", [None, "/source/checkout/src"])
+def test_spawn_worker_uses_sys_executable_without_venv(monkeypatch, pythonpath):
     """_spawn_worker falls back to sys.executable when no venv exists."""
     import sys
+
+    if pythonpath is None:
+        monkeypatch.delenv("PYTHONPATH", raising=False)
+    else:
+        monkeypatch.setenv("PYTHONPATH", pythonpath)
 
     mock_config = MagicMock()
     mock_config.tts.engine = "espeak"
@@ -234,13 +240,16 @@ def test_spawn_worker_uses_sys_executable_without_venv():
         cmd = popen_call[0][0]
         assert cmd[0] == sys.executable
 
-        # Env includes COQUI_TOS_AGREED but no PYTHONPATH (no venv)
+        # A system worker preserves the caller's import path without injecting one.
         env = popen_call[1].get("env")
         assert env is not None
         assert env["COQUI_TOS_AGREED"] == "1"
         assert env["DICTARE_TTS_TOKEN"] == mgr.auth_token
         assert "--token" not in cmd
-        assert "PYTHONPATH" not in env
+        if pythonpath is None:
+            assert "PYTHONPATH" not in env
+        else:
+            assert env["PYTHONPATH"] == pythonpath
 
 # ---------------------------------------------------------------------------
 # VENV_ENGINES registry
