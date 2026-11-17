@@ -71,15 +71,43 @@ def test_timeout_and_maximum_duration_cancel_without_flushing():
         assert engine.audio_manager.set_vad_explicit_turn.call_args_list[-1].args == (False,)
 
 
-def test_hold_does_not_start_while_strict_muted_or_reviewing():
+def test_hold_does_not_start_while_reviewing():
     engine = make_engine()
-    engine._strict_muted = True
-    engine.hotkey_down()
-    assert engine._controller._queue.empty()
-    engine._strict_muted = False
     engine.review_pending = lambda: True
     engine.hotkey_down()
     assert engine._controller._queue.empty()
+
+
+def test_strict_mute_hotkey_recovers_to_idle_without_capturing(monkeypatch):
+    monkeypatch.setattr("dictare.audio.beep.resume_feedback", lambda: None)
+    monkeypatch.setattr("dictare.tts.base.resume_native_audio", lambda: None)
+    engine = make_engine()
+    engine.tts_mgr = MagicMock()
+    engine._strict_muted = True
+    engine.hotkey_down()
+    process_next(engine)
+    assert not engine._strict_muted
+    assert engine.state == AppState.OFF
+    assert not engine._hold_capture_active
+    assert engine._controller._queue.empty()
+    engine.hotkey_up()  # The recovery press is not a captured turn.
+    engine.hotkey_down()
+    assert engine._hold_capture_active
+    engine.hotkey_other_key()
+    process_next(engine)
+    process_next(engine)
+
+
+def test_strict_mute_can_recover_from_legacy_tap_without_starting_a_hold(monkeypatch):
+    monkeypatch.setattr("dictare.audio.beep.resume_feedback", lambda: None)
+    monkeypatch.setattr("dictare.tts.base.resume_native_audio", lambda: None)
+    engine = make_engine()
+    engine.tts_mgr = MagicMock()
+    engine._strict_muted = True
+    engine.hotkey_tap()
+    process_next(engine)
+    assert not engine._strict_muted and engine.state == AppState.OFF
+    assert not engine._hold_capture_active
 
 
 def test_hold_press_before_runtime_is_ignored():
@@ -87,3 +115,14 @@ def test_hold_press_before_runtime_is_ignored():
     engine.hotkey_down()
     assert engine._controller._queue.empty()
     assert not engine._hold_capture_active
+
+
+def test_failed_strict_recovery_does_not_start_a_hold():
+    engine = make_engine()
+    engine._strict_muted = True
+    engine.audio_manager.resume_input.side_effect = RuntimeError("unavailable")
+    engine.hotkey_down()
+    process_next(engine)
+    assert engine._strict_muted and engine.state == AppState.OFF
+    assert not engine._hold_capture_active
+    assert engine._controller._queue.empty()

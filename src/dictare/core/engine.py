@@ -21,6 +21,7 @@ from dictare.core.fsm import (
     DiscardCurrent,
     HoldCaptureEnded,
     HotkeyPressed,
+    ResumeStrictForHold,
     SetListening,
     SpeechEnded,
     SpeechStarted,
@@ -1219,6 +1220,8 @@ class DictareEngine:
     def hotkey_tap(self) -> None:
         """Handle a legacy complete tap; it cannot represent a held shortcut."""
         if self._experimental_hold:
+            if self.running and self._strict_muted:
+                self._controller.send(ResumeStrictForHold(source="hotkey"))
             return
         self.tap_detector.on_key_down()
         self.tap_detector.on_key_up()
@@ -1226,8 +1229,11 @@ class DictareEngine:
     def hotkey_down(self) -> None:
         """Handle a physical press from a listener or the launcher."""
         if self._hold_gate:
+            if self.running and self._strict_muted:
+                self._controller.send(ResumeStrictForHold(source="hotkey"))
+                return
             if (not self.running or not self.audio_manager or self.state != AppState.OFF
-                    or self._strict_muted or self._voice_muted or self.review_pending()):
+                    or self._voice_muted or self.review_pending()):
                 return
             self._hold_gate.press()
             return
@@ -1452,8 +1458,8 @@ class DictareEngine:
             self._notify_status()
             return True
 
-    def resume_strict_mute(self) -> None:
-        """Resume the strict gate only through the controller's hotkey path."""
+    def resume_strict_mute(self, *, start_listening: bool = True) -> None:
+        """Resume strict mute through a hotkey, optionally remaining idle."""
         with self._strict_mute_transition_lock:
             with self._injection_lock:
                 if not self._strict_muted or self.review_pending():
@@ -1479,7 +1485,8 @@ class DictareEngine:
                     self._strict_audio_error = None
                     self._voice_muted = False
                     self._voice_mute_error = None
-                    self._controller.send(SetListening(on=True, source="strict_resume"))
+                    if start_listening:
+                        self._controller.send(SetListening(on=True, source="strict_resume"))
             if pending:
                 if self.audio_manager:
                     self.audio_manager.suspend_input()

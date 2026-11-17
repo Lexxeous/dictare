@@ -278,6 +278,12 @@ class SetListening(StateMessage):
     on: bool = True
 
 @dataclass(frozen=True)
+class ResumeStrictForHold(StateMessage):
+    """Use a hotkey to leave strict mute without starting an unattended turn."""
+
+    pass
+
+@dataclass(frozen=True)
 class HoldCaptureEnded(StateMessage):
     """A held turn was released, or cancelled after a lost release."""
 

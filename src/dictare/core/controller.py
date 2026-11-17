@@ -24,6 +24,7 @@ from dictare.core.fsm import (
     HotkeyPressed,
     PlayCompleted,
     PlayStarted,
+    ResumeStrictForHold,
     SetListening,
     SpeechEnded,
     SpeechStarted,
@@ -181,6 +182,9 @@ class StateController:
             self._handle_agent_switch(event)
         elif isinstance(event, SetListening):
             self._handle_set_listening(event)
+        elif isinstance(event, ResumeStrictForHold):
+            if self._engine and getattr(self._engine, "_strict_muted", False) is True and not self._review_pending():
+                self._engine.resume_strict_mute(start_listening=False)
         elif isinstance(event, HoldCaptureEnded):
             self._handle_hold_ended(event)
         elif isinstance(event, StrictMuted):
