@@ -32,10 +32,11 @@ class TestAgentBannerLogged:
         assert "Session:" not in captured.err
         assert "Running:" not in captured.err
 
-    def test_banner_logged_to_agent_file(self, tmp_path) -> None:
+    def test_banner_logged_to_agent_file(self, tmp_path, monkeypatch) -> None:
         """Banner info is written to the agent log file."""
         import logging
 
+        monkeypatch.setattr("dictare.agent.mux.SESSIONS_DIR", tmp_path / "sessions")
         log_file = tmp_path / "agent.test.jsonl"
         from dictare.logging.setup import DictareJsonFormatter
 
