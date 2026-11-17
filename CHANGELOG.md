@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Honor a pending stop after a recording too short to transcribe.
+- Discard audio queued during voice mute before processing a spoken resume.
 - Detect an occupied source-engine port before starting the development stack,
   and provide a checkout-verified source stop command.
 - Avoid terminating TTS workers belonging to other Dictare instances at startup.

@@ -737,7 +737,7 @@ class DictareEngine:
         """Admit audio only while listening and no review gate is closed."""
         return (
             self._state_manager.should_process_audio
-            and (not self._experimental_hold or self._hold_capture_active)
+            and (not self._experimental_hold or self._hold_capture_active or self._voice_muted)
             and self.capture_allowed()
             and (not self.agent_mode or bool(self.visible_agents))
         )
@@ -1204,9 +1204,12 @@ class DictareEngine:
         """Close admission immediately; the controller owns VAD and delivery."""
         self._hold_capture_active = False
         self._controller.send(HoldCaptureEnded(
-            cancelled=reason != "released", capture_generation=self._hold_capture_generation,
+            cancelled=reason != "released" or self._voice_muted,
+            capture_generation=self._hold_capture_generation,
             hold_generation=generation, source="hold",
         ))
+        if self._voice_muted and not self._strict_muted:
+            self._controller.send(SetListening(on=True, source="voice_mute"))
 
     def complete_hold(self, generation: int) -> None:
         """Reset VAD before allowing another turn; ignore stale acknowledgements."""
@@ -1384,6 +1387,8 @@ class DictareEngine:
             if self._voice_muted or self._strict_muted:
                 return
             self._voice_muted = True
+            if self._hold_gate:
+                self._hold_gate.cancel()
             self._voice_mute_pending = True
             self._voice_mute_error = None
             logger.info("voice_muted")
@@ -1407,6 +1412,8 @@ class DictareEngine:
                 self._voice_mute_error = "Could not stop feedback audio."
                 logger.exception("Could not stop muted feedback output")
             self._voice_mute_pending = False
+            if self._experimental_hold:
+                self._controller.send(SetListening(on=True, source="voice_mute"))
         self._notify_status()
 
     def strict_mute(self) -> bool:
@@ -1511,8 +1518,13 @@ class DictareEngine:
                 self._voice_mute_error = "Could not resume audio."
                 logger.exception("Could not resume audio after voice mute")
             else:
+                # Queued audio recorded while muted must not be delivered after
+                # the resume command changes the filter state.
+                self.discard_current_internal()
                 self._voice_muted = False
                 self._voice_mute_error = None
+                if self._experimental_hold:
+                    self._controller.send(SetListening(on=False, source="voice_unmute"))
                 logger.info("voice_unmuted")
                 phrases = self.config.pipeline.mute_filter.listen_phrases
                 if phrases and self.tts_mgr.available:
@@ -1932,7 +1944,8 @@ class DictareEngine:
         if _audio_ms > 500:
             logger.warning("start_runtime: start_streaming took %.0fms", _audio_ms)
 
-        if start_listening and not self._strict_muted:
+        should_listen = self._voice_muted if self._experimental_hold else start_listening
+        if should_listen and not self._strict_muted:
             old_state = self.state
             self._state_manager.transition(AppState.LISTENING)
             logger.info("start_runtime: transitioned %s → LISTENING", old_state.name)

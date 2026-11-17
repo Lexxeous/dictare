@@ -126,3 +126,64 @@ def test_failed_strict_recovery_does_not_start_a_hold():
     assert engine._strict_muted and engine.state == AppState.OFF
     assert not engine._hold_capture_active
     assert engine._controller._queue.empty()
+
+
+def test_standard_mute_listens_only_for_resume_and_returns_to_hold_idle(monkeypatch):
+    from dictare.core.openvip_messages import create_message
+
+    monkeypatch.setattr('dictare.audio.beep.cancel_pending_feedback', lambda: None)
+    monkeypatch.setattr('dictare.audio.beep.suspend_feedback', lambda **_: None)
+    monkeypatch.setattr('dictare.audio.beep.resume_feedback', lambda: None)
+    monkeypatch.setattr('dictare.tts.base.suspend_native_audio', lambda: True)
+    monkeypatch.setattr('dictare.tts.base.resume_native_audio', lambda: None)
+    engine = make_engine()
+    engine.tts_mgr = MagicMock(available=False)
+    engine._agent_mgr._current_agent_id = '__keyboard__'
+    engine.mute()
+    process_next(engine)
+    assert engine._voice_muted and engine.state == AppState.LISTENING
+    assert engine._should_process_capture()
+    assert engine._pipeline.process(create_message('private conversation')) == []
+    engine.inject_text('ok listen', capture_generation=engine._capture_generation)
+    assert not engine._voice_muted
+    assert not engine._should_process_capture()
+    process_next(engine)
+    assert engine.state == AppState.OFF
+    engine.audio_manager.clear_queue.assert_called()
+    engine.hotkey_down()
+    assert engine._hold_capture_active
+    engine.hotkey_other_key()
+    process_next(engine)
+    process_next(engine)
+
+
+def test_muting_during_hold_discards_turn_and_keeps_voice_resume_enabled(monkeypatch):
+    monkeypatch.setattr('dictare.audio.beep.cancel_pending_feedback', lambda: None)
+    monkeypatch.setattr('dictare.audio.beep.suspend_feedback', lambda **_: None)
+    monkeypatch.setattr('dictare.tts.base.suspend_native_audio', lambda: True)
+    engine = make_engine()
+    engine.tts_mgr = MagicMock(available=False)
+    engine._agent_mgr._current_agent_id = '__keyboard__'
+    engine.hotkey_down()
+    process_next(engine)
+    engine.mute()
+    assert not engine._hold_capture_active
+    process_next(engine)  # cancelled hold
+    process_next(engine)  # resume-only listening
+    process_next(engine)  # redundant resume-only request
+    assert engine._voice_muted and engine.state == AppState.LISTENING
+    assert engine._should_process_capture()
+    engine.audio_manager.flush_vad.assert_not_called()
+
+
+def test_restored_standard_mute_starts_in_resume_only_listening(monkeypatch):
+    monkeypatch.setattr('dictare.audio.beep.suspend_feedback', lambda **_: None)
+    monkeypatch.setattr('dictare.tts.base.suspend_native_audio', lambda: True)
+    engine = make_engine()
+    engine._controller.start = MagicMock()
+    engine._voice_muted = True
+    engine._agent_mgr._current_agent_id = '__keyboard__'
+    engine.start_runtime(start_listening=False)
+    assert engine.state == AppState.LISTENING
+    assert engine._voice_muted and engine._should_process_capture()
+    assert not engine._hold_capture_active

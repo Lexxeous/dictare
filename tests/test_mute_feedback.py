@@ -148,3 +148,17 @@ def test_failed_standard_mute_resume_remains_muted(monkeypatch):
     assert engine._voice_mute_error == "Could not resume audio."
     resume_native.assert_not_called()
     resume_feedback.assert_not_called()
+
+
+def test_resume_discards_audio_queued_while_muted(monkeypatch):
+    monkeypatch.setattr('dictare.audio.beep.resume_feedback', MagicMock())
+    monkeypatch.setattr('dictare.tts.base.resume_native_audio', MagicMock())
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine.audio_manager = MagicMock()
+    engine.tts_mgr = MagicMock(available=False)
+    engine._voice_muted = True
+    generation = engine._capture_generation
+    engine.unmute()
+    engine.audio_manager.clear_queue.assert_called_once()
+    engine.audio_manager.reset_vad.assert_called_once()
+    assert not engine.capture_allowed(generation)
