@@ -13,8 +13,9 @@ from dictare.core.fsm import AppState, HotkeyPressed, SetListening, Transcriptio
 @pytest.fixture(autouse=True)
 def isolate_output_gates(monkeypatch):
     monkeypatch.setattr("dictare.audio.beep.suspend_feedback", MagicMock())
+    monkeypatch.setattr("dictare.audio.beep.cancel_pending_feedback", MagicMock())
     monkeypatch.setattr("dictare.audio.beep.resume_feedback", MagicMock())
-    monkeypatch.setattr("dictare.tts.base.suspend_native_audio", MagicMock())
+    monkeypatch.setattr("dictare.tts.base.suspend_native_audio", MagicMock(return_value=True))
     monkeypatch.setattr("dictare.tts.base.resume_native_audio", MagicMock())
 
 
@@ -124,7 +125,7 @@ def test_strict_mute_rejects_new_tts_requests():
 def test_unconfirmed_worker_interrupt_is_not_silently_marked_safe():
     engine = DictareEngine(Config(), hotkey_enabled=False)
     engine.tts_mgr = MagicMock()
-    engine.tts_mgr.suspend_for_strict.return_value = False
+    engine.tts_mgr.suspend_for_mute.return_value = False
     engine.strict_mute()
     assert engine._strict_muted
     assert "did not confirm" in engine._strict_audio_error

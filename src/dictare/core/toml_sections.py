@@ -190,7 +190,8 @@ _MUTE_FILTER_HEADER = """\
 # max_scan_words = 10
 # decay_rate = 0.95
 
-# TTS phrases spoken on mute/unmute (random selection)
+# Muting is silent; mute_phrases is retained for compatibility and not played.
+# Resume phrases are selected at random.
 # mute_phrases = ["Going quiet.", "I'll be here when you need me.", "Taking a break.", "Standing by."]
 # listen_phrases = ["I'm all ears.", "Ready when you are.", "Listening.", "At your service."]
 

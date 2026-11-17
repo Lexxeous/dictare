@@ -78,12 +78,12 @@ def test_manager_revokes_worker_requests_before_stop_and_resume():
     proxy.suspend_requests.side_effect = lambda: order.append("revoke")
     manager._tts_proxy = proxy
     manager.stop_speaking = lambda: order.append("stop") or True
-    manager.suspend_for_strict()
+    manager.suspend_for_mute()
     assert order == ["revoke", "stop"]
     assert manager.handle_speech({"text": "ignored"})["status"] == "error"
-    manager.resume_after_strict()
+    manager.resume_after_mute()
     proxy.resume_requests.assert_called_once()
-    assert not manager._strict_suspended
+    assert not manager._mute_suspended
 
 
 def test_worker_interrupt_ack_requires_token_and_current_id():
@@ -92,7 +92,7 @@ def test_worker_interrupt_ack_requires_token_and_current_id():
 
     engine = MagicMock()
     engine.tts_mgr = TTSManager(Config())
-    engine.tts_mgr._strict_interrupt_id = "current"
+    engine.tts_mgr._mute_interrupt_id = "current"
     server = OpenVIPServer(engine, auth_tokens={"register_tts": "secret"})
     client = TestClient(server._app)
     assert client.get("/internal/tts/interrupt").status_code == 403
@@ -101,7 +101,7 @@ def test_worker_interrupt_ack_requires_token_and_current_id():
     assert client.get("/internal/tts/interrupt", headers=auth).json() == {"interrupt_id": "current"}
     assert client.post("/internal/tts/interrupt", headers=auth, json={"interrupt_id": "old"}).json() == {"accepted": False}
     assert client.post("/internal/tts/interrupt", headers=auth, json={"interrupt_id": "current"}).json() == {"accepted": True}
-    assert engine.tts_mgr._strict_interrupt_ack.is_set()
+    assert engine.tts_mgr._mute_interrupt_ack.is_set()
 
 
 def test_worker_acknowledges_only_after_tracked_audio_stops(monkeypatch):
@@ -135,10 +135,10 @@ def test_worker_ack_timeout_keeps_requests_suspended():
     manager._tts_proxy = proxy
     manager._tts_worker_process = MagicMock()
     manager._worker_ready = True
-    manager._strict_interrupt_ack = MagicMock()
-    manager._strict_interrupt_ack.wait.return_value = False
+    manager._mute_interrupt_ack = MagicMock()
+    manager._mute_interrupt_ack.wait.return_value = False
     manager.stop_speaking = lambda: True
-    assert not manager.suspend_for_strict()
+    assert not manager.suspend_for_mute()
     proxy.suspend_requests.assert_called_once()
-    assert manager._strict_suspended
-    assert manager.strict_interrupt_id() is None
+    assert manager._mute_suspended
+    assert manager.mute_interrupt_id() is None

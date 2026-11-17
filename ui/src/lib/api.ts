@@ -216,6 +216,7 @@ export type StatusResponse = {
 		strict_mute_pending?: boolean;
 		strict_mute_error?: string | null;
 		voice_mute_error?: string | null;
+		voice_mute_pending?: boolean;
 		strict_mute_available?: boolean;
 		strict_mute_source_test?: boolean;
 		uptime_seconds: number;

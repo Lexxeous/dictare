@@ -218,6 +218,7 @@ class DictareEngine:
         # except listen triggers. Engine stays in LISTENING (VAD+STT active).
         self._voice_muted = False
         self._voice_mute_error: str | None = None
+        self._voice_mute_pending = False
         # Separate from standard voice mute; not yet exposed in the UI.
         self._strict_muted = False
         self._strict_audio_error: str | None = None
@@ -360,8 +361,8 @@ class DictareEngine:
 
         self._voice_muted = saved_muted
         self._strict_muted = saved_strict_muted
-        if saved_strict_muted:
-            self.tts_mgr.suspend_for_strict()
+        if saved_strict_muted or saved_muted:
+            self.tts_mgr.suspend_for_mute()
 
         return False if saved_strict_muted else saved_listening
 
@@ -644,8 +645,8 @@ class DictareEngine:
         )
         self._loading_models[2] = self.tts_mgr.loading_status
 
-        # Pre-cache mute/listen TTS phrases in background
-        precache = self.config.pipeline.mute_filter.mute_phrases + self.config.pipeline.mute_filter.listen_phrases
+        # Pre-cache spoken resume phrases in background. Muting is silent.
+        precache = self.config.pipeline.mute_filter.listen_phrases
         if precache:
             self.tts_mgr.precache_phrases(precache)
 
@@ -1296,25 +1297,37 @@ class DictareEngine:
     # -------------------------------------------------------------------------
 
     def mute(self) -> None:
-        """Mute dictation while keeping recognition available for voice resume."""
-        import random
-
-        from dictare.audio.beep import suspend_feedback
+        """Silence output while retaining recognition for voice resume."""
+        from dictare.audio.beep import cancel_pending_feedback, suspend_feedback
+        from dictare.tts.base import suspend_native_audio
 
         with self._injection_lock:
             if self._voice_muted or self._strict_muted:
                 return
             self._voice_muted = True
+            self._voice_mute_pending = True
             self._voice_mute_error = None
             logger.info("voice_muted")
+            self._notify_status()
+            cancel_pending_feedback()
+            try:
+                if self.tts_mgr.suspend_for_mute() is False:
+                    self._voice_mute_error = "Speech worker did not confirm it stopped."
+            except Exception:
+                self._voice_mute_error = "Could not stop speech playback."
+                logger.exception("Could not stop speech playback while muted")
+            try:
+                if suspend_native_audio() is False:
+                    self._voice_mute_error = "Could not confirm speech playback stopped."
+            except Exception:
+                self._voice_mute_error = "Could not stop speech playback."
+                logger.exception("Could not stop native speech while muted")
             try:
                 suspend_feedback(stop_active=self.audio_manager is not None)
             except Exception:
                 self._voice_mute_error = "Could not stop feedback audio."
                 logger.exception("Could not stop muted feedback output")
-            phrases = self.config.pipeline.mute_filter.mute_phrases
-            if phrases and self.tts_mgr.available:
-                self.speak_text(random.choice(phrases))  # noqa: S311
+            self._voice_mute_pending = False
         self._notify_status()
 
     def strict_mute(self) -> bool:
@@ -1334,15 +1347,19 @@ class DictareEngine:
                 try:
                     # Revoke worker permits before waiting for VAD or device
                     # shutdown, so queued synthesis cannot start meanwhile.
-                    if self.tts_mgr.suspend_for_strict() is False:
+                    if self.tts_mgr.suspend_for_mute() is False:
                         self._strict_audio_error = "Speech worker did not confirm it stopped."
                 except Exception:
                     self._strict_audio_error = "Could not stop speech playback."
                     logger.exception("Could not stop speech playback")
                 self.discard_current_internal()
                 self._controller.send(StrictMuted(source="strict_mute"))
-            if suspend_native_audio() is False:
-                self._strict_audio_error = "Could not confirm speech playback stopped."
+            try:
+                if suspend_native_audio() is False:
+                    self._strict_audio_error = "Could not confirm speech playback stopped."
+            except Exception:
+                self._strict_audio_error = "Could not stop speech playback."
+                logger.exception("Could not stop native speech during strict mute")
             try:
                 suspend_feedback()
             except Exception:
@@ -1382,7 +1399,7 @@ class DictareEngine:
                     self.discard_current_internal()
                     resume_native_audio()
                     resume_feedback()
-                    self.tts_mgr.resume_after_strict()
+                    self.tts_mgr.resume_after_mute()
                     self._strict_muted = False
                     self._strict_audio_error = None
                     self._voice_muted = False
@@ -1399,17 +1416,25 @@ class DictareEngine:
         import random
 
         from dictare.audio.beep import resume_feedback
+        from dictare.tts.base import resume_native_audio
 
         with self._injection_lock:
             if not self._voice_muted or self._strict_muted:
                 return
-            self._voice_muted = False
-            self._voice_mute_error = None
-            logger.info("voice_unmuted")
-            resume_feedback()
-            phrases = self.config.pipeline.mute_filter.listen_phrases
-            if phrases and self.tts_mgr.available:
-                self.speak_text(random.choice(phrases))  # noqa: S311
+            try:
+                self.tts_mgr.resume_after_mute()
+                resume_native_audio()
+                resume_feedback()
+            except Exception:
+                self._voice_mute_error = "Could not resume audio."
+                logger.exception("Could not resume audio after voice mute")
+            else:
+                self._voice_muted = False
+                self._voice_mute_error = None
+                logger.info("voice_unmuted")
+                phrases = self.config.pipeline.mute_filter.listen_phrases
+                if phrases and self.tts_mgr.available:
+                    self.speak_text(random.choice(phrases))  # noqa: S311
         self._notify_status()
 
     # -------------------------------------------------------------------------
@@ -1562,12 +1587,12 @@ class DictareEngine:
 
     def speak_text(self, text: str) -> None:
         """Speak text using TTS (delegates to TTSManager)."""
-        if not self._strict_muted:
+        if not self._strict_muted and not self._voice_muted:
             self.tts_mgr.speak_text(text)
 
     def speak_agent(self, agent_name: str) -> None:
         """Announce agent name via TTS (delegates to TTSManager)."""
-        if not self._strict_muted:
+        if not self._strict_muted and not self._voice_muted:
             self.tts_mgr.speak_agent(agent_name)
 
     def reset_audio_input(self) -> None:
@@ -1592,8 +1617,8 @@ class DictareEngine:
 
     def handle_speech(self, body: dict) -> dict:
         """Handle a speech (TTS) request (delegates to TTSManager)."""
-        if self._strict_muted:
-            return {"openvip": "1.0", "status": "error", "error": "Strict mute is active"}
+        if self._strict_muted or self._voice_muted:
+            return {"openvip": "1.0", "status": "error", "error": "Dictation is muted"}
         return self.tts_mgr.handle_speech(body)
 
     def list_voices(self) -> list[str]:
@@ -1807,7 +1832,10 @@ class DictareEngine:
             suspend_feedback(stop_active=False)
         elif self._voice_muted:
             from dictare.audio.beep import suspend_feedback
+            from dictare.tts.base import suspend_native_audio
 
+            if suspend_native_audio() is False:
+                self._voice_mute_error = "Could not confirm speech playback stopped."
             suspend_feedback(stop_active=False)
 
         # Start audio streaming (always needed for VAD to work)

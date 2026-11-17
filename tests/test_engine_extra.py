@@ -273,6 +273,11 @@ class TestMuteUnmute:
     def isolate_feedback(self, monkeypatch):
         monkeypatch.setattr("dictare.audio.beep.suspend_feedback", MagicMock())
         monkeypatch.setattr("dictare.audio.beep.resume_feedback", MagicMock())
+        monkeypatch.setattr("dictare.audio.beep.cancel_pending_feedback", MagicMock())
+        monkeypatch.setattr("dictare.tts.base.suspend_native_audio", MagicMock(return_value=True))
+        monkeypatch.setattr("dictare.tts.base.resume_native_audio", MagicMock())
+        monkeypatch.setattr("dictare.core.tts_manager.TTSManager.suspend_for_mute", MagicMock(return_value=True))
+        monkeypatch.setattr("dictare.core.tts_manager.TTSManager.resume_after_mute", MagicMock())
 
     def test_mute_sets_flag(self) -> None:
         engine = DictareEngine(config=MockConfig())

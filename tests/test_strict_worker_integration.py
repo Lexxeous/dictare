@@ -29,7 +29,7 @@ def test_strict_mute_revokes_worker_and_terminates_active_playback(monkeypatch):
     manager._worker_ready = True
     def signal_worker(pid, sig):
         base.stop_audio_native()
-        manager.acknowledge_strict_interrupt(manager.strict_interrupt_id())
+        manager.acknowledge_mute_interrupt(manager.mute_interrupt_id())
     monkeypatch.setattr("os.kill", signal_worker)
     monkeypatch.setattr(base.sys, "platform", "darwin")
     process = MagicMock()
@@ -58,13 +58,13 @@ def test_strict_mute_revokes_worker_and_terminates_active_playback(monkeypatch):
         player = threading.Thread(target=playback)
         player.start()
         assert started.wait(timeout=2)
-        manager.suspend_for_strict()
+        manager.suspend_for_mute()
         assert stopped.wait(timeout=2)
         speaker.join(timeout=2)
         player.join(timeout=2)
         assert result == [False]
         assert not proxy.playback_permitted(message_id)
-        manager.resume_after_strict()
+        manager.resume_after_mute()
         assert not _playback_permitted("http://localhost", "token", message_id)
     finally:
         stopped.set()

@@ -55,11 +55,11 @@ class TTSManager:
         self._tts_error: str = ""
         self._tts_proxy: Any = None  # WorkerTTSEngine (set when using worker)
         self._tts_worker_process: Any = None  # subprocess.Popen for TTS worker
-        self._strict_suspended = False
+        self._mute_suspended = False
         self._strict_lock = threading.Lock()
         self._worker_ready = False
-        self._strict_interrupt_id: str | None = None
-        self._strict_interrupt_ack = threading.Event()
+        self._mute_interrupt_id: str | None = None
+        self._mute_interrupt_ack = threading.Event()
 
         # Play counter for mic-pausing: mic stays paused while any play is active.
         # Incremented before speak(), decremented after. 0→1 pauses mic, N→0 resumes.
@@ -231,7 +231,7 @@ class TTSManager:
         # Create proxy engine — it will wait for worker to connect
         proxy = WorkerTTSEngine(http_server)
         with self._strict_lock:
-            if self._strict_suspended:
+            if self._mute_suspended:
                 proxy.suspend_requests()
             self._tts_proxy = proxy
             self._tts_engine = proxy
@@ -303,7 +303,7 @@ class TTSManager:
         Args:
             text: Text to speak.
         """
-        if self._strict_suspended:
+        if self._mute_suspended:
             return
         if self._tts_error:
             logger.warning("speak_text: TTS failed to load: %s", self._tts_error)
@@ -372,8 +372,8 @@ class TTSManager:
         Raises:
             ValueError: If requested engine differs from configured engine.
         """
-        if self._strict_suspended:
-            return {"openvip": "1.0", "status": "error", "error": "Strict mute is active"}
+        if self._mute_suspended:
+            return {"openvip": "1.0", "status": "error", "error": "Dictation is muted"}
         text = body.get("text", "")
         if not text:
             return {"openvip": "1.0", "status": "error", "error": "No text provided"}
@@ -533,45 +533,45 @@ class TTSManager:
     # Lifecycle
     # ------------------------------------------------------------------
 
-    def strict_interrupt_id(self) -> str | None:
+    def mute_interrupt_id(self) -> str | None:
         """Current worker interruption waiting for acknowledgement, if any."""
         with self._strict_lock:
-            return self._strict_interrupt_id
+            return self._mute_interrupt_id
 
-    def acknowledge_strict_interrupt(self, interrupt_id: str) -> bool:
+    def acknowledge_mute_interrupt(self, interrupt_id: str) -> bool:
         with self._strict_lock:
-            if not interrupt_id or interrupt_id != self._strict_interrupt_id:
+            if not interrupt_id or interrupt_id != self._mute_interrupt_id:
                 return False
-            self._strict_interrupt_ack.set()
+            self._mute_interrupt_ack.set()
             return True
 
-    def suspend_for_strict(self) -> bool:
+    def suspend_for_mute(self) -> bool:
         """Revoke worker requests and wait for a ready worker to stop audio."""
         with self._strict_lock:
-            self._strict_suspended = True
+            self._mute_suspended = True
             if self._tts_proxy is not None:
                 self._tts_proxy.suspend_requests()
             wait_for_worker = self._tts_worker_process is not None and self._worker_ready
             if wait_for_worker:
-                self._strict_interrupt_id = secrets.token_hex(16)
-                self._strict_interrupt_ack.clear()
+                self._mute_interrupt_id = secrets.token_hex(16)
+                self._mute_interrupt_ack.clear()
         # A worker that has never connected cannot have received speech yet.
         if self._tts_worker_process is not None and not wait_for_worker:
             return True
         stopped = self.stop_speaking()
         if not wait_for_worker:
             return True
-        acknowledged = stopped and self._strict_interrupt_ack.wait(timeout=3.0)
+        acknowledged = stopped and self._mute_interrupt_ack.wait(timeout=3.0)
         with self._strict_lock:
-            self._strict_interrupt_id = None
+            self._mute_interrupt_id = None
         return bool(acknowledged)
 
-    def resume_after_strict(self) -> None:
+    def resume_after_mute(self) -> None:
         """Allow only newly submitted worker requests after explicit resume."""
         with self._strict_lock:
             if self._tts_proxy is not None:
                 self._tts_proxy.resume_requests()
-            self._strict_suspended = False
+            self._mute_suspended = False
 
     def stop_speaking(self) -> bool:
         """Interrupt the currently playing audio.

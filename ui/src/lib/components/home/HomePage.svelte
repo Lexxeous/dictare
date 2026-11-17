@@ -108,6 +108,7 @@
 		{/if}
 		{#if status?.platform.state === "muted"}
 			<p class="text-sm">Voice mute still hears the “listen” command. Use Stop listening above to turn listening off.</p>
+			{#if status.platform.voice_mute_pending}<p role="status" class="text-sm">Stopping audio…</p>{/if}
 			{#if status.platform.voice_mute_error}<p role="alert" class="text-sm text-destructive">Mute needs attention: {status.platform.voice_mute_error}</p>{/if}
 		{/if}
 		{#if error}<p role="alert" class="text-sm text-destructive">{error}</p>{/if}

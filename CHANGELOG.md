@@ -24,8 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Detect an occupied source-engine port before starting the development stack,
   and provide a checkout-verified source stop command.
 - Avoid terminating TTS workers belonging to other Dictare instances at startup.
-- Cancel queued and active feedback while voice-muted, suppress new feedback,
-  and keep its status steady during background speech.
+- Cancel queued and active sound and speech while voice-muted, suppress new
+  audio, and keep its status steady while recognizing spoken resume phrases.
+  Mute confirmation is silent; existing mute phrase settings are retained.
 - Omit transcript previews and recognized command text from normal session and
   engine logs; keep speech synthesis diagnostics to counts and request metadata.
 - Wrap the sidebar version label and remove its divider while collapsed. Add

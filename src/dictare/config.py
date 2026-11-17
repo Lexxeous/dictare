@@ -417,9 +417,8 @@ def _default_listen_triggers() -> dict[str, list[list[str]]]:
 class MuteFilterConfig(BaseModel):
     """Voice mute filter configuration.
 
-    Trigger patterns and TTS feedback for the mute/listen feature.
-    The filter detects triggers; the engine executes mute/unmute and
-    plays TTS feedback using the phrases configured here.
+    Trigger patterns and resume feedback for the mute/listen feature.
+    The filter detects triggers; muting is silent and resuming may speak.
     """
 
     enabled: bool = Field(default=True, description="Enable voice mute/unmute filter")
@@ -438,7 +437,7 @@ class MuteFilterConfig(BaseModel):
             "Taking a break.",
             "Standing by.",
         ],
-        description="TTS phrases spoken when muting (random selection)",
+        description="Legacy setting retained for compatibility; muting is silent",
     )
     listen_phrases: list[str] = Field(
         default_factory=lambda: [
@@ -1023,7 +1022,8 @@ claim_key = "ctrl+\\\\"              # Hotkey to claim this agent (ctrl+\\, ctrl
 # max_scan_words = 10
 # decay_rate = 0.95
 
-# TTS phrases spoken on mute/unmute (random selection)
+# Muting is silent; mute_phrases is retained for compatibility and not played.
+# Resume phrases are selected at random.
 # mute_phrases = ["Going quiet.", "I'll be here when you need me.", "Taking a break.", "Standing by."]
 # listen_phrases = ["I'm all ears.", "Ready when you are.", "Listening.", "At your service."]
 

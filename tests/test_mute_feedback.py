@@ -67,6 +67,8 @@ def test_standard_mute_blocks_queued_and_new_feedback_until_voice_resume(monkeyp
     pending = queue.Queue()
     monkeypatch.setattr(beep, "_play_queue", pending)
     monkeypatch.setattr(beep, "_ensure_worker", lambda: None)
+    monkeypatch.setattr("dictare.tts.base.suspend_native_audio", MagicMock(return_value=True))
+    monkeypatch.setattr("dictare.tts.base.resume_native_audio", MagicMock())
     engine = DictareEngine(Config(), hotkey_enabled=False)
     engine.tts_mgr = MagicMock(available=False)
     complete = MagicMock()
@@ -89,6 +91,8 @@ def test_standard_mute_reports_output_failure(monkeypatch):
 
     monkeypatch.setattr("dictare.audio.beep.suspend_feedback", MagicMock(side_effect=RuntimeError("audio failure")))
     monkeypatch.setattr("dictare.audio.beep.resume_feedback", MagicMock())
+    monkeypatch.setattr("dictare.tts.base.suspend_native_audio", MagicMock(return_value=True))
+    monkeypatch.setattr("dictare.tts.base.resume_native_audio", MagicMock())
     monkeypatch.setattr(status_report, "audio_devices", lambda: {})
     monkeypatch.setattr(status_report, "permissions", lambda: {})
     monkeypatch.setattr(status_report, "hotkey_active", lambda engine: False)
@@ -103,3 +107,44 @@ def test_standard_mute_reports_output_failure(monkeypatch):
     assert engine.capture_allowed()
     engine.unmute()
     assert engine._voice_mute_error is None
+
+
+def test_standard_mute_silences_speech_but_still_allows_voice_resume(monkeypatch):
+    monkeypatch.setattr("dictare.audio.beep.cancel_pending_feedback", MagicMock())
+    monkeypatch.setattr("dictare.audio.beep.suspend_feedback", MagicMock())
+    monkeypatch.setattr("dictare.audio.beep.resume_feedback", MagicMock())
+    monkeypatch.setattr("dictare.tts.base.suspend_native_audio", MagicMock(return_value=True))
+    monkeypatch.setattr("dictare.tts.base.resume_native_audio", MagicMock())
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine.tts_mgr = MagicMock(available=False)
+    engine.tts_mgr.suspend_for_mute.return_value = True
+    engine.mute()
+    engine.tts_mgr.suspend_for_mute.assert_called_once()
+    engine.speak_text("must stay quiet")
+    engine.speak_agent("codex")
+    assert engine.handle_speech({"text": "must stay quiet"})["status"] == "error"
+    engine.tts_mgr.speak_text.assert_not_called()
+    engine.tts_mgr.speak_agent.assert_not_called()
+    assert engine.capture_allowed()
+    engine.unmute()
+    engine.tts_mgr.resume_after_mute.assert_called_once()
+    assert not engine._voice_muted
+
+
+def test_failed_standard_mute_resume_remains_muted(monkeypatch):
+    monkeypatch.setattr("dictare.audio.beep.cancel_pending_feedback", MagicMock())
+    monkeypatch.setattr("dictare.audio.beep.suspend_feedback", MagicMock())
+    resume_feedback = MagicMock()
+    monkeypatch.setattr("dictare.audio.beep.resume_feedback", resume_feedback)
+    monkeypatch.setattr("dictare.tts.base.suspend_native_audio", MagicMock(return_value=True))
+    resume_native = MagicMock()
+    monkeypatch.setattr("dictare.tts.base.resume_native_audio", resume_native)
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine.tts_mgr = MagicMock(available=False)
+    engine.tts_mgr.resume_after_mute.side_effect = RuntimeError("unavailable")
+    engine.mute()
+    engine.unmute()
+    assert engine._voice_muted
+    assert engine._voice_mute_error == "Could not resume audio."
+    resume_native.assert_not_called()
+    resume_feedback.assert_not_called()

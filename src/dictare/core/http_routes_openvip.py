@@ -205,7 +205,7 @@ def register_openvip_routes(app: FastAPI, server: OpenVIPServer) -> None:
         if not server.has_permission(request, "register_tts"):
             raise HTTPException(status_code=403, detail="Forbidden")
         return JSONResponse(
-            {"interrupt_id": server.engine.tts_mgr.strict_interrupt_id()},
+            {"interrupt_id": server.engine.tts_mgr.mute_interrupt_id()},
             headers={"Cache-Control": "no-store"},
         )
 
@@ -214,7 +214,7 @@ def register_openvip_routes(app: FastAPI, server: OpenVIPServer) -> None:
         if not server.has_permission(request, "register_tts"):
             raise HTTPException(status_code=403, detail="Forbidden")
         body = await request.json()
-        accepted = server.engine.tts_mgr.acknowledge_strict_interrupt(str(body.get("interrupt_id", "")))
+        accepted = server.engine.tts_mgr.acknowledge_mute_interrupt(str(body.get("interrupt_id", "")))
         return {"accepted": accepted}
 
     @app.get("/internal/tts/permit/{message_id}")

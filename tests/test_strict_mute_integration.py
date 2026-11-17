@@ -35,7 +35,7 @@ def test_source_strict_mute_stops_capture_and_resumes_only_by_hotkey(monkeypatch
     engine.audio_manager = MagicMock()
     engine.audio_manager.get_actual_devices.return_value = {"input": None, "output": None}
     engine.tts_mgr = MagicMock()
-    engine.tts_mgr.suspend_for_strict.return_value = True
+    engine.tts_mgr.suspend_for_mute.return_value = True
     controller = MagicMock()
     controller.on_hotkey_tap.side_effect = lambda: engine._controller.send(HotkeyPressed(source="test"))
     server = OpenVIPServer(engine, controller)
