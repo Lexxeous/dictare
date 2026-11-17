@@ -192,8 +192,7 @@ class DictareEngine:
         self.requested_exit_reason = "normal"
         self._injection_lock = threading.RLock()  # Serialize capture cancellation and delivery.
         self._review_slot = ReviewSlot()
-        # Internal until capture, UI and settings are validated together.
-        self._review_enabled = False
+        self._review_enabled = config.output.review_before_send is True
         self._logger = logger
 
         # Pipelines for message processing

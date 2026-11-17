@@ -225,6 +225,10 @@ class OutputConfig(BaseModel):
         default=False,
         description="Automatically submit each transcription (press Enter / send to agent). When off, text accumulates until manual submit via double-tap or trigger word.",
     )
+    review_before_send: bool = Field(
+        default=False,
+        description="Pause after each transcription so it can be reviewed before sending.",
+    )
     submit_keys: str = Field(
         default="enter",
         description="Keyboard mode only: key combination to submit (when auto_submit=true)",
@@ -977,6 +981,7 @@ mode_switch_modifier = "KEY_RIGHTALT"  # Hold + hotkey to switch agent/keyboard 
 # mode = "agents"                 # agents (default, OpenVIP SSE) or keyboard (type into focused window)
 # typing_delay_ms = 2             # keyboard mode only: delay between characters (ms)
 # auto_submit = false              # auto-send each transcription (default: accumulate)
+# review_before_send = false       # pause to review each transcription before sending
 # submit_keys = "enter"           # keyboard mode only
 # newline_keys = "{newline_keys}" # keyboard mode only
 

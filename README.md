@@ -267,6 +267,21 @@ applies. Resume works after voice mute; use Home or your shortcut to start
 fully stopped listening. Voice mute currently keeps recognition active to hear
 Resume; it does not turn off microphone capture.
 
+## Review words before sending
+
+In Settings → General, turn on **Review words before sending** and save. After
+each prompt, Dictare stops listening and shows your words and their assistant
+on Home. Choose Send or Discard, then start listening again when ready. A
+failed send leaves the unsent words visible. The destination is the original
+assistant connection; reconnecting under the same name does not redirect it.
+Sending queues the message for that connection, which is not a guarantee the
+assistant has processed it.
+
+Keyboard mode cannot safely hold the focused window as a destination. In that
+mode, copy your words from the review panel and discard the draft. A pending
+prompt is kept in memory only and is lost if Dictare closes. Resolve it before
+stopping or restarting from Dictare.
+
 ## Privacy and local diagnostics
 
 Normal dictation processes microphone audio in memory. The latest transcript

@@ -10,6 +10,7 @@
 	import VoiceCommands from "./VoiceCommands.svelte";
 	import ModelsPage from "$lib/components/models/ModelsPage.svelte";
 	import { Button } from "$lib/components/ui/button";
+	import { Switch } from "$lib/components/ui/switch";
 	import { RotateCcw, CheckCircle, XCircle } from "lucide-svelte";
 	import type { TabDef, NavChild } from "$lib/types";
 	import * as settingsStore from "$lib/stores/settings.svelte";
@@ -241,6 +242,16 @@
 									<button class="rounded-md border px-3 py-2 text-sm {getTheme() === choice ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'}" aria-pressed={getTheme() === choice} onclick={() => setTheme(choice as Theme)}>{choice.charAt(0).toUpperCase() + choice.slice(1)}</button>
 								{/each}
 							</div>
+						</div>
+					</div>
+					<div class="px-4 mb-6">
+						<div class="rounded-lg border px-4 py-3 space-y-2">
+							<div class="flex items-center justify-between gap-4">
+								<label for="review-before-send" class="text-sm font-medium">Review words before sending</label>
+								<Switch id="review-before-send" checked={settingsStore.getValue("output.review_before_send") === true} onCheckedChange={(value) => settingsStore.markDirty("output.review_before_send", value)} />
+							</div>
+							<p class="text-sm text-muted-foreground">Pause after each prompt so you can send or discard it on Home. Listening stays off until you start it again.</p>
+							<p class="text-sm text-muted-foreground">Review sends to connected assistants. In keyboard mode, copy your words from Home instead.</p>
 						</div>
 					</div>
 					{#if launchAtLogin !== null}

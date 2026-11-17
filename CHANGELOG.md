@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Optionally pause after each prompt for review, with an explicit Send or
+  Discard action and the original assistant destination shown on Home.
 - Configure personal mute, resume, and send phrases in Commands; show saved
   phrases on Home and preserve advanced language patterns when turned off.
 - Add a plain-language Home with listening controls, destination and command
