@@ -359,12 +359,15 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
         if "values" in body or "profiles" in body:
             values = body.get("values", {})
             profiles = body.get("profiles", {})
+            creations = body.get("create_profiles", [])
+            if not isinstance(creations, list) or any(not isinstance(name, str) for name in creations):
+                raise HTTPException(status_code=400, detail="Expected a list of new profile names")
             if not isinstance(profiles, dict) or any(
                 not isinstance(name, str) or not isinstance(changes, dict)
                 for name, changes in profiles.items()
             ):
                 raise HTTPException(status_code=400, detail="Expected profile changes by name")
-            if not isinstance(values, dict) or (not values and not profiles) or any(
+            if not isinstance(values, dict) or (not values and not profiles and not creations) or any(
                 not isinstance(key, str)
                 or value is None
                 or not (isinstance(value, (str, bool, int, float)) or
@@ -377,6 +380,7 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
                 set_config_values(
                     {key: None if value == "" else value if isinstance(value, (list, dict)) else str(value) for key, value in values.items()},
                     profile_updates=profiles,
+                    create_profiles=creations,
                 )
                 logger.info("settings.change keys=%s", sorted(values))
                 return {"status": "ok"}

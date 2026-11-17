@@ -259,3 +259,23 @@ def test_editing_a_language_pattern_keeps_its_inline_comment(path):
     set_config_values({'pipeline.mute_filter.mute_triggers': {'es': [['vale', 'mudo']]}}, path)
     assert load_config(path).pipeline.mute_filter.mute_triggers['es'] == [['vale', 'mudo']]
     assert '# keep' in path.read_text()
+
+
+def test_create_profile_with_dotted_name_and_set_default_atomically(path):
+    client = TestClient(OpenVIPServer(MockEngine(), MockController(), port=0)._app)
+    response = client.post('/api/settings', json={'values': {'agent_profiles.default': 'my.agent'}, 'create_profiles': ['my.agent'], 'profiles': {'my.agent': {'command': ['my-agent'], 'description': 'New'}}})
+    assert response.status_code == 200
+    config = load_config(path)
+    assert config.agent_profiles.default == 'my.agent'
+    assert config.agent_profiles.get('my.agent').command == ['my-agent']
+    assert '[agent_profiles."my.agent"]' in path.read_text()
+
+
+def test_profile_creation_rejects_invalid_duplicate_or_incomplete_without_writes(path):
+    path.write_text('[agent_profiles.codex]\ncommand = ["codex"]\n')
+    original = path.read_bytes()
+    client = TestClient(OpenVIPServer(MockEngine(), MockController(), port=0)._app)
+    for name, profile in [('codex', {'command': ['x']}), ('bad name', {'command': ['x']}), ('new', {'command': []}), ('new', {'description': 'x'})]:
+        response = client.post('/api/settings', json={'values': {'editor': 'new'}, 'create_profiles': [name], 'profiles': {name: profile}})
+        assert response.status_code == 400
+        assert path.read_bytes() == original

@@ -3,11 +3,31 @@
 	import SelectField from "./SelectField.svelte";
 	import BoolField from "./BoolField.svelte";
 	import TomlField from "./TomlField.svelte";
+	import { Button } from "$lib/components/ui/button";
 
 	const profiles = $derived((settingsStore.getValue("agent_profiles") ?? {}) as Record<string, unknown>);
-	const options = $derived(Object.entries(profiles)
-		.filter(([, value]) => value !== null && typeof value === "object" && !Array.isArray(value))
-		.map(([name]) => ({ value: name, label: name })));
+	const options = $derived([
+		...Object.entries(profiles)
+			.filter(([, value]) => value !== null && typeof value === "object" && !Array.isArray(value))
+			.map(([name]) => ({ value: name, label: name })),
+		...settingsStore.getCreatedProfiles().map((name) => ({ value: name, label: name })),
+	]);
+	let newName = $state("");
+	let nameError = $state("");
+	function addProfile(): void {
+		const name = newName.trim();
+		if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(name) || ["default", "live_dangerously", "constructor", "prototype"].includes(name)) {
+			nameError = "Use letters, numbers, dots, hyphens or underscores for a new profile name.";
+			return;
+		}
+		if (options.some((option) => option.value === name)) {
+			nameError = "A profile with this name already exists.";
+			return;
+		}
+		settingsStore.createProfile(name);
+		newName = "";
+		nameError = "";
+	}
 	const selected = $derived((settingsStore.getValue("agent_profiles.default") as string | null) ?? "");
 	const dangerous = $derived(Boolean(settingsStore.getValue("agent_profiles.live_dangerously")));
 	const listFields = [
@@ -46,6 +66,10 @@
 			<details class="border rounded-md mb-2">
 				<summary class="cursor-pointer px-4 py-3 text-sm font-medium">{option.label}</summary>
 				<div class="px-4 pb-4 space-y-3">
+					{#if settingsStore.getCreatedProfiles().includes(option.value)}
+						<p class="text-xs text-muted-foreground">Enter an executable as the first line of the command before saving.</p>
+						<Button variant="ghost" size="sm" onclick={() => settingsStore.discardNewProfile(option.value)}>Remove new profile</Button>
+					{/if}
 					<label class="block text-sm">Description
 						<input class="mt-1 w-full rounded-md border bg-background px-3 py-2" type="text"
 							value={(profileValue(option.value, "description") as string) ?? ""}
@@ -69,6 +93,11 @@
 				</div>
 			</details>
 		{/each}
+		<div class="flex flex-wrap gap-2 mb-3">
+			<input class="w-48 rounded-md border bg-background px-3 py-2 text-sm" aria-label="New profile name" placeholder="New profile name" bind:value={newName} />
+			<Button variant="outline" size="sm" onclick={addProfile}>Add profile</Button>
+		</div>
+		{#if nameError}<p role="alert" class="text-xs text-destructive mb-2">{nameError}</p>{/if}
 		<TomlField section="agent_profiles" label="Advanced: edit assistant profiles" />
 	</div>
 </div>

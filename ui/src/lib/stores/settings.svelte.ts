@@ -6,6 +6,7 @@ let schema = $state<SchemaResponse | null>(null);
 let dirty = $state<Record<string, unknown>>({});
 let dirtyToml = $state<Record<string, string>>({});
 let dirtyProfiles = $state<ProfileChanges>({});
+let createdProfiles = $state<string[]>([]);
 let dirtyModels = $state<Record<string, string>>({});
 let dirtyShortcuts = $state<Shortcut[] | null>(null);
 let saveStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
@@ -30,6 +31,20 @@ export function getSchema(): SchemaResponse | null {
 }
 export function getDirty(): Record<string, unknown> {
 	return dirty;
+}
+export function getCreatedProfiles(): string[] { return createdProfiles; }
+export function createProfile(name: string): void {
+	createdProfiles = [...createdProfiles, name];
+	markProfileDirty(name, "command", []);
+}
+export function discardNewProfile(name: string): void {
+	createdProfiles = createdProfiles.filter((profile) => profile !== name);
+	const { [name]: _, ...rest } = dirtyProfiles;
+	dirtyProfiles = rest;
+	if (dirty["agent_profiles.default"] === name) {
+		const saved = schema?.values.agent_profiles as Record<string, unknown> | undefined;
+		markDirty("agent_profiles.default", saved?.default ?? "");
+	}
 }
 export function getDirtyProfiles(): ProfileChanges {
 	return dirtyProfiles;
@@ -130,6 +145,7 @@ export function resetDirty(): void {
 	dirty = {};
 	dirtyToml = {};
 	dirtyProfiles = {};
+	createdProfiles = [];
 	dirtyModels = {};
 	dirtyShortcuts = null;
 	saveErrors = {};
@@ -235,7 +251,7 @@ export async function saveAll(): Promise<void> {
 	// Save form fields
 	if (Object.keys(dirty).length || Object.keys(dirtyProfiles).length) {
 		try {
-			await saveSettings(dirty, dirtyProfiles);
+			await saveSettings(dirty, dirtyProfiles, createdProfiles);
 		} catch (e) {
 			errors.settings = (e as Error).message;
 			errorCount++;
@@ -289,7 +305,8 @@ export async function saveAll(): Promise<void> {
 			const profiles = schema.values.agent_profiles as Record<string, Record<string, unknown>> | undefined;
 			if (profiles) {
 				for (const [name, changes] of Object.entries(dirtyProfiles)) {
-					if (!profiles[name]) continue;
+					if (createdProfiles.includes(name)) profiles[name] = {};
+					if (!Object.hasOwn(profiles, name)) continue;
 					for (const [field, value] of Object.entries(changes)) {
 						if (value === null) delete profiles[name][field];
 						else profiles[name][field] = value;
@@ -308,6 +325,7 @@ export async function saveAll(): Promise<void> {
 		dirty = {};
 		dirtyToml = {};
 		dirtyProfiles = {};
+		createdProfiles = [];
 		dirtyModels = {};
 		dirtyShortcuts = null;
 		saveStatus = "saved";

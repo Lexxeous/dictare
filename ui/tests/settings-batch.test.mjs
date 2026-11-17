@@ -26,3 +26,11 @@ test("profile names and argument lists are sent as structured data", async (t) =
 	});
 	await saveSettings({}, { "my.profile": { command: ["agent", "--resume"] } });
 });
+
+test("new profile creation uses an explicit name and structured command", async (t) => {
+	t.mock.method(globalThis, "fetch", async (_url, init) => {
+		assert.deepEqual(JSON.parse(init.body), { values: {}, profiles: { "my.agent": { command: ["agent"] } }, create_profiles: ["my.agent"] });
+		return Response.json({ status: "ok" });
+	});
+	await saveSettings({}, { "my.agent": { command: ["agent"] } }, ["my.agent"]);
+});

@@ -760,6 +760,7 @@ def set_config_values(
     config_path: Path | None = None,
     *,
     profile_updates: dict[str, dict[str, Any]] | None = None,
+    create_profiles: list[str] | None = None,
 ) -> None:
     """Validate form changes together, then replace one comment-preserving TOML file.
 
@@ -771,7 +772,7 @@ def set_config_values(
 
     import tomlkit
 
-    if not updates and not profile_updates:
+    if not updates and not profile_updates and not create_profiles:
         return
     config_path = (config_path or get_config_path()).resolve()
     config_dict = load_config(config_path).model_dump()
@@ -876,6 +877,27 @@ def set_config_values(
                 if not isinstance(table, dict):
                     raise ValueError(f"Config section is not a table: {section}")
                 table[field] = parsed
+    profile_tables: Any
+    if create_profiles:
+        import re
+
+        if len(set(create_profiles)) != len(create_profiles):
+            raise ValueError("Duplicate agent profile names")
+        profiles = config_dict["agent_profiles"]
+        if "agent_profiles" not in doc:
+            doc.add("agent_profiles", tomlkit.table())
+        profile_tables = doc["agent_profiles"]
+        if not isinstance(profile_tables, dict):
+            raise ValueError("Agent profiles must be a table")
+        for name in create_profiles:
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", name) or name in {"default", "live_dangerously"}:
+                raise ValueError("Invalid agent profile name")
+            if name in profiles or name in profile_tables:
+                raise ValueError(f"Agent profile already exists: {name}")
+            if not profile_updates or name not in profile_updates or "command" not in profile_updates[name]:
+                raise ValueError(f"An executable is required: {name}")
+            profiles[name] = {}
+            profile_tables[name] = tomlkit.table()
     if profile_updates:
         profiles = config_dict["agent_profiles"]
         profile_tables = doc.get("agent_profiles")
@@ -908,7 +930,7 @@ def set_config_values(
                     table[field] = value
             AgentProfileConfig.model_validate(profile)
     Config.model_validate(config_dict)
-    if not profile_updates and not config_path.exists() and all(value is None for value in updates.values()):
+    if not profile_updates and not create_profiles and not config_path.exists() and all(value is None for value in updates.values()):
         return
     _stamp_version(doc)
     config_path.parent.mkdir(parents=True, exist_ok=True)
