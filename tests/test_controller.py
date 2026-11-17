@@ -56,6 +56,9 @@ class MockEngine:
         self.injections: list[Any] = []
         self.agent_switches: list[tuple[str, int]] = []
 
+    def capture_allowed(self, generation=None) -> bool:
+        return True
+
     def transcribe_and_process(self, audio_data: Any, agent: Any = None) -> None:
         self.transcriptions.append((audio_data, agent))
 

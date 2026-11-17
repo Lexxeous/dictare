@@ -23,6 +23,7 @@ from dictare.core.fsm import (
     HotkeyPressed,
     PlayCompleted,
     PlayStarted,
+    PrivacyMuted,
     SetListening,
     SpeechEnded,
     SpeechStarted,
@@ -157,6 +158,9 @@ class StateController:
 
     def _handle_event(self, event: StateMessage) -> None:
         """Handle a single event. Called sequentially, never concurrently."""
+        if isinstance(event, (SpeechStarted, SpeechEnded, TranscriptionCompleted)):
+            if self._engine and not self._engine.capture_allowed(event.capture_generation):
+                return
         if isinstance(event, SpeechStarted):
             self._handle_speech_start(event)
         elif isinstance(event, SpeechEnded):
@@ -173,6 +177,14 @@ class StateController:
             self._handle_agent_switch(event)
         elif isinstance(event, SetListening):
             self._handle_set_listening(event)
+        elif isinstance(event, PrivacyMuted):
+            self._cancel_transcription_watchdog()
+            self._pending_transcription = None
+            self._desired_state_after_play = AppState.OFF
+            old = self._state_manager.state
+            self._state_manager.transition(AppState.OFF, force=True)
+            if self._on_state_change and old != AppState.OFF:
+                self._on_state_change(old, AppState.OFF, "privacy_mute")
         elif isinstance(event, DiscardCurrent):
             self._handle_discard_current(event)
 
@@ -233,9 +245,8 @@ class StateController:
         # Start transcription (with captured agent)
         self._start_transcription_watchdog()
         if self._engine:
-            self._engine.transcribe_and_process(
-                event.audio_data, agent=event.agent
-            )
+            kwargs = {"capture_generation": event.capture_generation} if event.capture_generation is not None else {}
+            self._engine.transcribe_and_process(event.audio_data, agent=event.agent, **kwargs)
 
     def _start_transcription_watchdog(self) -> None:
         """Start watchdog timer for transcription timeout."""
@@ -243,6 +254,7 @@ class StateController:
         self._transcription_watchdog = threading.Timer(
             self.TRANSCRIPTION_TIMEOUT,
             self._on_transcription_timeout,
+            kwargs={"capture_generation": getattr(self._engine, "_capture_generation", None)},
         )
         self._transcription_watchdog.daemon = True
         self._transcription_watchdog.start()
@@ -253,14 +265,14 @@ class StateController:
             self._transcription_watchdog.cancel()
             self._transcription_watchdog = None
 
-    def _on_transcription_timeout(self) -> None:
+    def _on_transcription_timeout(self, capture_generation: int | None = None) -> None:
         """Watchdog fired: STT took too long, force recovery."""
         if self._state_manager.state == AppState.TRANSCRIBING:
             logger.warning(
                 "Transcription watchdog timeout (%.0fs) — forcing recovery",
                 self.TRANSCRIPTION_TIMEOUT,
             )
-            self.send(TranscriptionCompleted(text="", source="timeout"))
+            self.send(TranscriptionCompleted(text="", source="timeout", capture_generation=capture_generation))
 
     def _handle_transcription_complete(self, event: TranscriptionCompleted) -> None:
         """Transcription finished."""
@@ -271,7 +283,8 @@ class StateController:
             self._pending_transcription = event
             # Still inject the text (goes to correct agent via captured agent)
             if self._engine and event.text:
-                self._engine.inject_text(event.text, agent=event.agent, language=event.language)
+                kwargs = {"capture_generation": event.capture_generation} if event.capture_generation is not None else {}
+                self._engine.inject_text(event.text, agent=event.agent, language=event.language, **kwargs)
             return
 
         # Normal flow: transition to target state and inject
@@ -283,7 +296,8 @@ class StateController:
             self._on_state_change(old_state, target_state, "transcription_complete")
 
         if self._engine and event.text:
-            self._engine.inject_text(event.text, agent=event.agent, language=event.language)
+            kwargs = {"capture_generation": event.capture_generation} if event.capture_generation is not None else {}
+            self._engine.inject_text(event.text, agent=event.agent, language=event.language, **kwargs)
 
         # Process queued audio only when going back to LISTENING
         if target_state == AppState.LISTENING and self._engine:
@@ -370,6 +384,9 @@ class StateController:
 
     def _handle_hotkey_toggle(self, event: HotkeyPressed) -> None:
         """User wants to toggle listening."""
+        if self._engine and getattr(self._engine, "_voice_muted", False) is True:
+            self._engine.unmute()
+            return
         current = self._state_manager.state
 
         if current == AppState.OFF:
@@ -420,6 +437,9 @@ class StateController:
 
     def _handle_set_listening(self, event: SetListening) -> None:
         """API request to set listening on/off."""
+        if event.on and self._engine and getattr(self._engine, "_voice_muted", False) is True:
+            self._engine.unmute()
+            return
         current = self._state_manager.state
 
         if event.on and current == AppState.OFF:

@@ -1,0 +1,3 @@
+name = "mute-isolation"
+bump = "patch"
+summary = "Prevent muted capture and stale pre-mute transcription delivery."

@@ -207,6 +207,7 @@ class StateMessage:
 
     timestamp: float = field(default_factory=time.time)
     source: str = ""  # "vad", "stt", "tts", "hotkey", "api", etc.
+    capture_generation: int | None = None  # Reject capture work from before mute.
 
 # --- Notifications (past tense — something happened) ---
 
@@ -274,6 +275,12 @@ class SetListening(StateMessage):
     """API request to set listening on/off."""
 
     on: bool = True
+
+@dataclass(frozen=True)
+class PrivacyMuted(StateMessage):
+    """Cancel capture state after the engine closes its privacy gate."""
+
+    pass
 
 @dataclass(frozen=True)
 class DiscardCurrent(StateMessage):

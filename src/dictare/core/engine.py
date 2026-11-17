@@ -152,7 +152,7 @@ class DictareEngine:
         # and native STT stacks (MLX, onnxruntime) misbehave when invoked
         # from ever-changing threads. The generation counter lets hang
         # recovery abandon a stuck worker and ignore its zombie results.
-        self._stt_jobs: queue.Queue[tuple[Any, Agent | None] | None] = queue.Queue()
+        self._stt_jobs: queue.Queue[tuple[Any, Agent | None, int] | None] = queue.Queue()
         self._stt_worker: threading.Thread | None = None
         self._stt_generation = 0
         self._stt_job_started: float | None = None
@@ -189,7 +189,7 @@ class DictareEngine:
         self.running = False
         self.requested_exit_code = 0
         self.requested_exit_reason = "normal"
-        self._injection_lock = threading.Lock()  # Lock for text injection
+        self._injection_lock = threading.RLock()  # Serialize mute with pipeline/delivery.
         self._logger = logger
 
         # Pipelines for message processing
@@ -213,6 +213,7 @@ class DictareEngine:
         # Voice muted flag — when True, MuteFilter discards all text
         # except listen triggers. Engine stays in LISTENING (VAD+STT active).
         self._voice_muted = False
+        self._capture_generation = 0
 
         # Guard against concurrent audio reconnect attempts
         self._reconnecting = threading.Lock()
@@ -655,14 +656,18 @@ class DictareEngine:
 
     def _on_vad_speech_start(self) -> None:
         """Handle VAD speech start detection."""
+        if not self.capture_allowed():
+            return
         # Send event to controller - it handles the state transition
-        self._controller.send(SpeechStarted(source="vad"))
+        self._controller.send(SpeechStarted(source="vad", capture_generation=self._capture_generation))
 
         if self._logger:
             self._logger.log_vad_event("speech_start")
 
     def _on_vad_speech_end(self, audio_data: Any) -> None:
         """Handle VAD speech end detection."""
+        if not self.capture_allowed():
+            return
         # Capture agent NOW, before sending event
         # This ensures audio goes to the agent that was active when speech ended
         captured_agent = self._get_current_agent()
@@ -678,6 +683,7 @@ class DictareEngine:
                 audio_data=audio_data,
                 agent=captured_agent,
                 source="vad",
+                capture_generation=self._capture_generation,
             )
         )
 
@@ -685,7 +691,7 @@ class DictareEngine:
     # Transcription
     # -------------------------------------------------------------------------
 
-    def transcribe_and_process(self, audio_data: Any, agent: Agent | None = None) -> None:
+    def transcribe_and_process(self, audio_data: Any, agent: Agent | None = None, capture_generation: int | None = None) -> None:
         """Queue audio for transcription on the dedicated STT worker.
 
         Called by StateController when SpeechEnded is processed.
@@ -697,13 +703,16 @@ class DictareEngine:
                    goes to the correct agent even if agent switches during transcription.
         """
         # Use provided agent (captured at speech-end time)
-        captured_agent = agent if agent is not None else self._get_current_agent()
-        self._recover_stt_if_hung()
-        with self._stt_state_lock:
-            if self._stt_worker is None or not self._stt_worker.is_alive():
-                self._start_stt_worker(reload_model=False)
-            jobs = self._stt_jobs
-        jobs.put((audio_data, captured_agent))
+        with self._injection_lock:
+            if not self.capture_allowed(capture_generation):
+                return
+            captured_agent = agent if agent is not None else self._get_current_agent()
+            self._recover_stt_if_hung()
+            with self._stt_state_lock:
+                if self._stt_worker is None or not self._stt_worker.is_alive():
+                    self._start_stt_worker(reload_model=False)
+                jobs = self._stt_jobs
+            jobs.put((audio_data, captured_agent, self._capture_generation))
 
     def _start_stt_worker(self, *, reload_model: bool) -> None:
         """Spawn the STT worker for the current generation/queue.
@@ -771,11 +780,13 @@ class DictareEngine:
             job = jobs.get()
             if job is None:
                 return
-            audio_data, captured_agent = job
+            audio_data, captured_agent, capture_generation = job
+            if not self.capture_allowed(capture_generation):
+                continue
             with self._stt_state_lock:
                 self._stt_job_started = time.monotonic()
             try:
-                self._transcribe_job(audio_data, captured_agent, generation)
+                self._transcribe_job(audio_data, captured_agent, generation, capture_generation)
             finally:
                 with self._stt_state_lock:
                     if self._stt_generation == generation:
@@ -786,7 +797,8 @@ class DictareEngine:
             return self._stt_generation == generation
 
     def _transcribe_job(
-        self, audio_data: Any, captured_agent: Agent | None, generation: int
+        self, audio_data: Any, captured_agent: Agent | None, generation: int,
+        capture_generation: int | None = None,
     ) -> None:
         """Run one transcription and dispatch its result.
 
@@ -797,7 +809,7 @@ class DictareEngine:
         transcribed_text = ""
         detected_language: str | None = None
         try:
-            if not self._stt:
+            if not self._stt or not self.capture_allowed(capture_generation):
                 return
 
             # Track transcription time
@@ -813,43 +825,44 @@ class DictareEngine:
             )
             transcribe_time = time.time() - transcribe_start
 
-            if not self._stt_generation_current(generation):
-                logger.warning(
-                    "Discarding transcription from abandoned STT worker "
-                    "(generation %d)",
-                    generation,
-                )
-                return
-
-            text = stt_result.text
-            detected_language = stt_result.language
-
-            if text:
-                transcribed_text = text
-                self._last_text = text
-
-                # Update session stats
-                audio_duration = len(audio_data) / self.config.audio.advanced.sample_rate
-                self._stats.count += 1
-                self._stats.chars += len(text)
-                self._stats.words += len(text.split())
-                self._stats.audio_seconds += audio_duration
-                self._stats.transcription_seconds += transcribe_time
-
-                # Log transcription
-                if self._logger:
-                    duration_ms = audio_duration * 1000
-                    stt_ms = transcribe_time * 1000
-                    self._logger.log_transcription(
-                        text=text,
-                        duration_ms=duration_ms,
-                        language=self.config.stt.language,
-                        stt_ms=stt_ms,
+            with self._injection_lock:
+                if not self._stt_generation_current(generation) or not self.capture_allowed(capture_generation):
+                    logger.warning(
+                        "Discarding transcription from abandoned STT worker "
+                        "(generation %d)",
+                        generation,
                     )
-
-                # Check if user has turned off listening
-                if self.is_off:
                     return
+
+                text = stt_result.text
+                detected_language = stt_result.language
+
+                if text:
+                    transcribed_text = text
+                    self._last_text = text
+
+                    # Update session stats
+                    audio_duration = len(audio_data) / self.config.audio.advanced.sample_rate
+                    self._stats.count += 1
+                    self._stats.chars += len(text)
+                    self._stats.words += len(text.split())
+                    self._stats.audio_seconds += audio_duration
+                    self._stats.transcription_seconds += transcribe_time
+
+                    # Log transcription
+                    if self._logger:
+                        duration_ms = audio_duration * 1000
+                        stt_ms = transcribe_time * 1000
+                        self._logger.log_transcription(
+                            text=text,
+                            duration_ms=duration_ms,
+                            language=self.config.stt.language,
+                            stt_ms=stt_ms,
+                        )
+
+                    # Check if user has turned off listening
+                    if self.is_off:
+                        return
 
         except Exception as e:
             logger.exception("STT transcription failed")
@@ -859,22 +872,24 @@ class DictareEngine:
             # Send completion event to controller (it handles state
             # transition) — unless this worker was abandoned: the watchdog
             # already recovered the FSM, a stale completion would fight it.
-            if self._stt_generation_current(generation):
-                self._controller.send(
-                    TranscriptionCompleted(
-                        text=transcribed_text,
-                        agent=captured_agent,
-                        language=detected_language if transcribed_text else None,
-                        source="stt",
+            with self._injection_lock:
+                if self._stt_generation_current(generation) and self.capture_allowed(capture_generation):
+                    self._controller.send(
+                        TranscriptionCompleted(
+                            text=transcribed_text,
+                            agent=captured_agent,
+                            language=detected_language if transcribed_text else None,
+                            source="stt",
+                            capture_generation=capture_generation,
+                        )
                     )
-                )
 
     def process_queued_audio(self) -> None:
         """Process any queued audio from speech that occurred during transcription.
 
         Called by StateController after transcription completes.
         """
-        if not self.audio_manager:
+        if not self.audio_manager or not self.capture_allowed():
             return
 
         sample_rate = self.audio_manager.sample_rate
@@ -895,6 +910,7 @@ class DictareEngine:
                     audio_data=audio_data,
                     agent=self._get_current_agent(),
                     source="queued",
+                    capture_generation=self._capture_generation,
                 )
             )
             return
@@ -903,7 +919,18 @@ class DictareEngine:
     # Text Injection
     # -------------------------------------------------------------------------
 
-    def inject_text(self, text: str, *, agent: Agent | None = None, language: str | None = None) -> None:
+    def capture_allowed(self, generation: int | None = None) -> bool:
+        """Whether this capture belongs to the current, unmuted interval."""
+        return not self._voice_muted and (generation is None or generation == self._capture_generation)
+
+    def inject_text(self, text: str, *, agent: Agent | None = None, language: str | None = None, capture_generation: int | None = None) -> None:
+        """Commit pipeline effects and delivery atomically with respect to mute."""
+        with self._injection_lock:
+            if not self.capture_allowed(capture_generation):
+                return
+            self._inject_text_allowed(text, agent=agent, language=language)
+
+    def _inject_text_allowed(self, text: str, *, agent: Agent | None = None, language: str | None = None) -> None:
         """Inject text into the target agent.
 
         Uses OpenVIP message format - each agent handles its own transport:
@@ -983,6 +1010,8 @@ class DictareEngine:
 
         # Lock to prevent concurrent injections
         with self._injection_lock:
+            if self._voice_muted:
+                return  # A pipeline mute command must prevent later delivery.
             inject_start = time.time()
 
             if target_agent:
@@ -1041,6 +1070,8 @@ class DictareEngine:
 
     def _play_focus_gated_sound(self, event: str) -> None:
         """Play a sound if the feedback policy allows it."""
+        if self._voice_muted:
+            return
         from dictare.audio.beep import get_sound_for_event, play_sound_file_async
 
         if not self._feedback_policy.should_play(
@@ -1178,44 +1209,41 @@ class DictareEngine:
     # -------------------------------------------------------------------------
 
     def mute(self) -> None:
-        """Mute voice input (idempotent).
+        """Close the capture gate and invalidate prior work. Resume explicitly."""
+        from dictare.audio.beep import stop_loop
+        from dictare.core.fsm import PrivacyMuted
 
-        Engine stays in LISTENING — VAD+STT keep running so MuteFilter
-        can detect the listen trigger. All other text is discarded.
-        Plays a random TTS mute phrase.
-        """
-        if self._voice_muted:
-            return
-        self._voice_muted = True
+        with self._injection_lock:
+            if self._voice_muted:
+                return
+            self._voice_muted = True
+            self._capture_generation += 1
+            self._submit_pending = False
+            self.discard_current_internal()
+            while True:
+                try:
+                    job = self._stt_jobs.get_nowait()
+                except queue.Empty:
+                    break
+                if job is None:
+                    self._stt_jobs.put(None)  # Preserve shutdown's worker sentinel.
+                    break
+            self._controller.send(PrivacyMuted(source="mute"))
         logger.info("voice_muted")
-
-        # TTS feedback
-        import random
-        phrases = self.config.pipeline.mute_filter.mute_phrases
-        if phrases and self.tts_mgr.available:
-            phrase = random.choice(phrases)  # noqa: S311
-            self.tts_mgr.speak_text(phrase)
-
+        stop_loop()
+        self.tts_mgr.stop_speaking()
         self._notify_status()
 
     def unmute(self) -> None:
-        """Unmute voice input (idempotent).
-
-        Resumes normal text flow through the pipeline.
-        Plays a random TTS listen phrase.
-        """
-        if not self._voice_muted:
-            return
-        self._voice_muted = False
+        """Open a fresh capture interval after an explicit user action."""
+        with self._injection_lock:
+            if not self._voice_muted:
+                return
+            self.discard_current_internal()
+            self._capture_generation += 1
+            self._voice_muted = False
+            self._controller.send(SetListening(on=True, source="unmute"))
         logger.info("voice_unmuted")
-
-        # TTS feedback
-        import random
-        phrases = self.config.pipeline.mute_filter.listen_phrases
-        if phrases and self.tts_mgr.available:
-            phrase = random.choice(phrases)  # noqa: S311
-            self.tts_mgr.speak_text(phrase)
-
         self._notify_status()
 
     # -------------------------------------------------------------------------
@@ -1566,6 +1594,7 @@ class DictareEngine:
             self.audio_manager.start_streaming(
                 should_process=lambda: (
                     self._state_manager.should_process_audio
+                    and self.capture_allowed()
                     and (not self.agent_mode or bool(self.visible_agents))
                 ),
                 is_running=lambda: self.running,

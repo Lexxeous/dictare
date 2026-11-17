@@ -67,7 +67,7 @@
 		</Button>
 		<p class="text-sm text-muted-foreground">Stopping listening keeps Dictare open. A current sentence may finish processing first.</p>
 		{#if status?.platform.state === "muted"}
-			<p class="text-sm">Voice mute still hears the “listen” command. Use Stop listening above to turn listening off.</p>
+			<p class="text-sm">Use Start listening or your shortcut key to resume. Voice commands are not heard while muted.</p>
 		{/if}
 		{#if error}<p role="alert" class="text-sm text-destructive">{error}</p>{/if}
 	</div>
@@ -87,7 +87,7 @@
 		<dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
 			<dt class="font-medium">“OK, send” or “OK, submit”</dt><dd>Send your words to the assistant.</dd>
 			<dt class="font-medium">“OK, mute” or “OK, hold on”</dt><dd>Pause dictation by voice.</dd>
-			<dt class="font-medium">“OK, listen” or “OK, listen up”</dt><dd>Resume dictation after voice mute.</dd>
+			<dt class="font-medium">Start listening or your shortcut key</dt><dd>Resume after muting. The microphone does not process voice commands while muted.</dd>
 			<dt class="font-medium">“Agent” followed by its name</dt><dd>Switch to another connected assistant.</dd>
 		</dl>
 	</div>

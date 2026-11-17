@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guidance and explicit handling of unconfirmed shutdown requests.
 
 ### Fixed
+- Gate voice-muted capture before recognition and reject prior capture events
+  and transcription results across mute/resume using capture generations.
 - Treat a trailing resume as named-agent continuation; resolve and display the
   selected Codex session instead of attempting to execute a resume binary.
 

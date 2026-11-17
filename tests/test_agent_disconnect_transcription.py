@@ -50,6 +50,9 @@ class RecordingEngine:
     def process_queued_audio(self) -> None:
         pass
 
+    def capture_allowed(self, generation=None) -> bool:
+        return True
+
 class DisconnectedAgent:
     """Agent whose transport is gone — send() always fails (SSEAgent shape)."""
 

@@ -191,10 +191,16 @@ selection to the configured resume arguments.
 |---|---|
 | *"ok, submit"* / *"ok, send"* / *"ok, invia"* / *"ja, senden"* | Submit to agent (Enter) |
 | *"ok, mute"* / *"ok, hold on"* | Mute (stop listening) |
-| *"ok, listen"* / *"ok, listen up"* | Unmute (resume listening) |
+| Start listening in Home, or the configured hotkey | Resume after voice mute |
 | *"agent coding"* / *"agent review"* | Switch active agent |
 
 Submit triggers are multilingual (en, de, es, it, fr) and fully configurable.
+
+Voice mute closes the speech-processing gate, so it cannot hear a spoken
+resume command. Use Home's **Start listening** button or the configured hotkey.
+Capture generations discard earlier recordings/transcription results even
+when you resume quickly. This branch's capture gate is a development
+checkpoint; queued feedback and worker TTS cancellation still need validation.
 
 ## Hotkey Cheat Sheet
 

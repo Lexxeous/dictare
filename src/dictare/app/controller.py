@@ -69,6 +69,9 @@ class _ControllerEvents(EngineEvents):
         if old == AppState.TRANSCRIBING:
             stop_loop()
 
+        if eng and eng._voice_muted:
+            return
+
         if new == AppState.LISTENING and old == AppState.OFF:
             enabled, path = get_sound_for_event(config.audio, "start")
             if enabled:
@@ -122,7 +125,8 @@ class _ControllerEvents(EngineEvents):
             return
         eng = self._engine_ref
         if eng:
-            eng.speak_agent(agent_name)
+            if not eng._voice_muted:
+                eng.speak_agent(agent_name)
         else:
             logger.warning("on_agent_change: engine_ref not set")
 
