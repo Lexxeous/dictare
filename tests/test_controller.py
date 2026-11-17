@@ -171,7 +171,7 @@ class TestSpeechEvents:
                     source="vad",
                 )
             )
-            _wait_until(lambda: sm.state == AppState.TRANSCRIBING)
+            _wait_until(lambda: sm.state == AppState.TRANSCRIBING and len(engine.transcriptions) == 1)
 
             assert sm.state == AppState.TRANSCRIBING
             assert len(engine.transcriptions) == 1
@@ -203,6 +203,21 @@ class TestSpeechEvents:
             assert any(t == "audio_too_short" for _, _, t in state_changes)
         finally:
             controller.stop()
+
+def test_short_audio_respects_pending_stop_and_discards_capture() -> None:
+    sm = StateManager(initial_state=AppState.RECORDING)
+    engine = MockEngine()
+    controller = StateController(sm)
+    controller.set_engine(engine)
+
+    controller._handle_event(SetListening(on=False, source="api"))
+    controller._handle_event(SpeechEnded(audio_data=np.zeros(1000, dtype=np.float32), source="vad"))
+
+    assert sm.state == AppState.OFF
+    assert not engine.transcriptions
+    engine.audio_manager.reset_vad.assert_called_once()
+    engine.audio_manager.clear_queue.assert_called_once()
+
 
 class TestSpeechEndQueuesAudio:
     """Test speech queuing during TRANSCRIBING and INJECTING."""

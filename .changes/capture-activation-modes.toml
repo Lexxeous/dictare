@@ -1,0 +1,3 @@
+name = "capture-activation-modes"
+bump = "minor"
+summary = "Prepare capture lifecycle for additional activation modes."

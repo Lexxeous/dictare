@@ -235,11 +235,13 @@ class StateController:
         # Check minimum duration
         min_samples = int(sample_rate * 0.3)  # MIN_RECORDING_DURATION
         if len(event.audio_data) < min_samples:
-            self._state_manager.reset_to_listening()
+            target_state = self._desired_state_after_play
+            self._desired_state_after_play = AppState.LISTENING
+            self._state_manager.transition(target_state, force=True)
             if self._on_state_change:
-                self._on_state_change(
-                    AppState.TRANSCRIBING, AppState.LISTENING, "audio_too_short"
-                )
+                self._on_state_change(AppState.TRANSCRIBING, target_state, "audio_too_short")
+            if target_state == AppState.OFF:
+                self._discard_capture()
             return
 
         # Start transcription (with captured agent)
