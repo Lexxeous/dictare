@@ -3,10 +3,19 @@
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 
 from dictare.config import Config
 from dictare.core.engine import DictareEngine
 from dictare.core.fsm import AppState, HotkeyPressed, SetListening, TranscriptionCompleted
+
+
+@pytest.fixture(autouse=True)
+def isolate_output_gates(monkeypatch):
+    monkeypatch.setattr("dictare.audio.beep.suspend_feedback", MagicMock())
+    monkeypatch.setattr("dictare.audio.beep.resume_feedback", MagicMock())
+    monkeypatch.setattr("dictare.tts.base.suspend_native_audio", MagicMock())
+    monkeypatch.setattr("dictare.tts.base.resume_native_audio", MagicMock())
 
 
 def test_strict_gate_rejects_stale_audio_and_requires_hotkey(monkeypatch):
@@ -98,3 +107,15 @@ def test_failed_input_reopen_keeps_strict_gate_closed(monkeypatch):
     assert not engine.capture_allowed()
     assert engine.state == AppState.OFF
     assert engine._controller._queue.empty()
+
+
+def test_strict_mute_rejects_new_tts_requests():
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine.tts_mgr = MagicMock()
+    engine._strict_muted = True
+    engine.speak_text("private")
+    engine.speak_agent("codex")
+    assert engine.handle_speech({"text": "private"})["status"] == "error"
+    engine.tts_mgr.speak_text.assert_not_called()
+    engine.tts_mgr.speak_agent.assert_not_called()
+    engine.tts_mgr.handle_speech.assert_not_called()

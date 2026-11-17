@@ -1223,7 +1223,7 @@ class DictareEngine:
         If truly idle (LISTENING, no speech), sends an immediate empty
         submit message.
         """
-        if self.review_pending():
+        if self.review_pending() or self._strict_muted:
             return
         state = self._state_manager.state
         vad_speaking = (
@@ -1297,7 +1297,7 @@ class DictareEngine:
         can detect the listen trigger. All other text is discarded.
         Plays a random TTS mute phrase.
         """
-        if self._voice_muted:
+        if self._voice_muted or self._strict_muted:
             return
         self._voice_muted = True
         logger.info("voice_muted")
@@ -1316,7 +1316,8 @@ class DictareEngine:
 
         Kept internal until queued audio and TTS cancellation are implemented.
         """
-        from dictare.audio.beep import stop_loop
+        from dictare.audio.beep import suspend_feedback
+        from dictare.tts.base import suspend_native_audio
 
         with self._strict_mute_transition_lock:
             with self._injection_lock:
@@ -1325,6 +1326,11 @@ class DictareEngine:
                 self._strict_muted = True
                 self.discard_current_internal()
                 self._controller.send(StrictMuted(source="strict_mute"))
+            suspend_native_audio()
+            try:
+                suspend_feedback()
+            except Exception:
+                logger.exception("Could not stop feedback output")
             # Native lifecycle operations run on the audio owner, not the VAD
             # callback thread. The processing gate remains closed on failure.
             if self.audio_manager:
@@ -1332,7 +1338,6 @@ class DictareEngine:
                     self.audio_manager.suspend_input()
                 except Exception:
                     logger.exception("Could not close strict-muted input")
-            stop_loop()
             try:
                 self.tts_mgr.stop_speaking()
             except Exception:
@@ -1362,6 +1367,11 @@ class DictareEngine:
                 if self.audio_manager:
                     self.audio_manager.suspend_input()
                 return
+            from dictare.audio.beep import resume_feedback
+            from dictare.tts.base import resume_native_audio
+
+            resume_native_audio()
+            resume_feedback()
             self._notify_status()
 
     def unmute(self) -> None:
@@ -1370,7 +1380,7 @@ class DictareEngine:
         Resumes normal text flow through the pipeline.
         Plays a random TTS listen phrase.
         """
-        if not self._voice_muted:
+        if not self._voice_muted or self._strict_muted:
             return
         self._voice_muted = False
         logger.info("voice_unmuted")
@@ -1534,11 +1544,13 @@ class DictareEngine:
 
     def speak_text(self, text: str) -> None:
         """Speak text using TTS (delegates to TTSManager)."""
-        self.tts_mgr.speak_text(text)
+        if not self._strict_muted:
+            self.tts_mgr.speak_text(text)
 
     def speak_agent(self, agent_name: str) -> None:
         """Announce agent name via TTS (delegates to TTSManager)."""
-        self.tts_mgr.speak_agent(agent_name)
+        if not self._strict_muted:
+            self.tts_mgr.speak_agent(agent_name)
 
     def reset_audio_input(self) -> None:
         """Reset audio input to current config. Called from HTTP endpoint."""
@@ -1562,6 +1574,8 @@ class DictareEngine:
 
     def handle_speech(self, body: dict) -> dict:
         """Handle a speech (TTS) request (delegates to TTSManager)."""
+        if self._strict_muted:
+            return {"openvip": "1.0", "status": "error", "error": "Strict mute is active"}
         return self.tts_mgr.handle_speech(body)
 
     def list_voices(self) -> list[str]:
@@ -1749,6 +1763,14 @@ class DictareEngine:
                 on_other_key=self.tap_detector.on_other_key,
                 on_combo=self.toggle_mode,
             )
+
+        # Restored strict mute must suppress output before opening runtime audio.
+        if self._strict_muted:
+            from dictare.audio.beep import suspend_feedback
+            from dictare.tts.base import suspend_native_audio
+
+            suspend_native_audio()
+            suspend_feedback(stop_active=False)
 
         # Start audio streaming (always needed for VAD to work)
         _t0 = time.monotonic()

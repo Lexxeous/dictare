@@ -177,8 +177,8 @@ def cancel_pending_feedback() -> None:
         stop_loop()
 
 
-def suspend_feedback() -> None:
-    """Suppress new feedback, cancel queued items, and stop active output."""
+def suspend_feedback(*, stop_active: bool = True) -> None:
+    """Suppress new feedback, cancel queued items, and optionally stop output."""
     global _feedback_suspended, _play_generation
     with _play_generation_lock:
         _feedback_suspended = True
@@ -189,7 +189,8 @@ def suspend_feedback() -> None:
                 _fallback_process.terminate()
             except (ProcessLookupError, OSError):
                 pass
-    stop_portaudio_output()
+    if stop_active:
+        stop_portaudio_output()
 
 
 def resume_feedback() -> None:
