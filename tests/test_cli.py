@@ -517,3 +517,64 @@ class TestAgentSessionBinding:
         assert result.exit_code == 0
         (command,) = captured
         assert command[:2] == ["claude", "-c"]
+
+    def test_bare_resume_alias_uses_latest_codex_session(self, tmp_path, monkeypatch) -> None:
+        """`agent <name> resume` resolves the Codex session instead of execing `resume`."""
+        import json
+        import os
+        from unittest.mock import patch
+
+        from dictare.agent import session_adapters, session_registry
+        from dictare.config import (
+            AgentProfileConfig,
+            AgentProfilesConfig,
+            ClientConfig,
+            Config,
+        )
+
+        session_id = "019f1f48-47d6-7bc3-8217-adfcbdd68318"
+        session_root = tmp_path / "codex-sessions"
+        rollout = (
+            session_root / "2026" / "11" / "16"
+            / f"rollout-2026-11-16T10-00-00-{session_id}.jsonl"
+        )
+        rollout.parent.mkdir(parents=True)
+        rollout.write_text(
+            json.dumps({"payload": {"session_id": session_id, "cwd": os.getcwd()}})
+            + "\n",
+            encoding="utf-8",
+        )
+        adapter = session_adapters.get_adapter("codex")
+        monkeypatch.setattr(type(adapter), "SESSIONS_ROOT", session_root)
+
+        profile = AgentProfileConfig(
+            command=["codex"],
+            continue_args=["resume", "--last"],
+        )
+        cfg = Config().model_copy(update={
+            "agent_profiles": AgentProfilesConfig(default="codex", codex=profile),
+            "client": ClientConfig(url="http://127.0.0.1:8770"),
+        })
+        captured: list[tuple[list[str], dict[str, object]]] = []
+
+        def fake_run_agent(
+            agent_id: str, command: list[str], **kwargs: object
+        ) -> int:
+            captured.append((command, kwargs))
+            return 0
+
+        with (
+            patch("dictare.cli.agent._check_engine", return_value=True),
+            patch("dictare.config.load_config", return_value=cfg),
+            patch("dictare.agent.run_agent", side_effect=fake_run_agent),
+            patch("dictare.cli.agent.shutil.which", return_value="/usr/bin/codex"),
+        ):
+            result = runner.invoke(app, ["agent", "codex", "resume"])
+
+        assert result.exit_code == 0
+        (command, kwargs), = captured
+        assert command == ["codex", "resume", session_id]
+        assert kwargs["startup_message"] == f"Resuming codex session {session_id}"
+        entry = session_registry.lookup(os.getcwd(), "codex")
+        assert entry is not None
+        assert entry["session_id"] == session_id

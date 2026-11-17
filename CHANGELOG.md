@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Treat a trailing resume as named-agent continuation; resolve and display the
+  selected Codex session instead of attempting to execute a resume binary.
+
 ### Development
 - Define one immediate feature branch per local request, complexity-ordered
   implementation, validated checkpoint commits, and build/runner review.

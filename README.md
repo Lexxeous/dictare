@@ -171,8 +171,15 @@ Then connect:
 ```bash
 dictare agent freddie                      # default profile (codex)
 dictare agent ozzy --profile claude        # use claude profile
-dictare agent -- claude --model opus       # explicit command override
+dictare agent freddie --continue           # resume the named agent session
+dictare agent freddie resume               # shorthand for --continue
+dictare agent freddie -- claude --model opus  # explicit command override
 ```
+
+For Codex, continuation uses the named agent binding when available; otherwise
+it selects the newest Codex session in the current folder. Dictare displays the
+selected session ID before Codex starts, or explains when it must delegate
+selection to the configured resume arguments.
 
 ## Voice Commands
 

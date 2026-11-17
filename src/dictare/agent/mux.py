@@ -980,6 +980,7 @@ def run_agent(
     info_key: str = "ctrl+]",
     global_hotkey_key: str | None = None,
     live_dangerously_args: list[str] | None = None,
+    startup_message: str | None = None,
 ) -> int:
     """Run a command with multiplexed input from stdin and dictare SSE.
 
@@ -999,6 +1000,7 @@ def run_agent(
             terminal stdin when the terminal also reports the physical key.
         live_dangerously_args: Permission-bypass args that were injected into
             the command, shown in the info notification when set.
+        startup_message: Optional status printed after terminal clear and before launch.
 
     Returns:
         Exit code of the process.
@@ -1086,6 +1088,10 @@ def run_agent(
         if clear_on_start:
             sys.stdout.buffer.write(b"\x1b[2J\x1b[H")
             sys.stdout.buffer.flush()
+
+        if startup_message:
+            sys.stdout.write(f"[dictare] {startup_message}\r\n")
+            sys.stdout.flush()
 
         session.start()
 

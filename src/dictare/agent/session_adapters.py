@@ -49,6 +49,10 @@ class SessionAdapter:
         """Args that resume the exact bound session, or None if unbound."""
         return None
 
+    def latest_binding(self, cwd: str) -> dict[str, str]:
+        """Return the newest resumable session for *cwd*, when discoverable."""
+        return {}
+
     def discover_binding(self, cwd: str, launched_after: float) -> dict[str, str]:
         """Best-effort post-exit discovery of the session identity."""
         return {}
@@ -197,6 +201,17 @@ class CodexAdapter(SessionAdapter):
         session_id = entry.get("session_id")
         return ["resume", str(session_id)] if session_id else None
 
+    def latest_binding(self, cwd: str) -> dict[str, str]:
+        """Find Codex's newest rollout for this working directory."""
+        newest = _newest_session_file(
+            self.SESSIONS_ROOT,
+            "rollout-*.jsonl",
+            0,
+            cwd,
+            lambda header: (header.get("payload") or {}).get("cwd"),
+        )
+        return self._binding_for_file(newest) if newest else {}
+
     def discover_binding(self, cwd: str, launched_after: float) -> dict[str, str]:
         newest = _newest_session_file(
             self.SESSIONS_ROOT,
@@ -205,14 +220,15 @@ class CodexAdapter(SessionAdapter):
             cwd,
             lambda header: (header.get("payload") or {}).get("cwd"),
         )
-        if not newest:
-            return {}
+        return self._binding_for_file(newest) if newest else {}
+
+    def _binding_for_file(self, path: Path) -> dict[str, str]:
         # Prefer the id recorded in the header; fall back to the filename.
-        header = _first_line_json(newest)
+        header = _first_line_json(path)
         session_id = (header.get("payload") or {}).get("session_id")
         if session_id:
             return {"session_id": str(session_id)}
-        match = self._ROLLOUT_RE.search(newest.name)
+        match = self._ROLLOUT_RE.search(path.name)
         return {"session_id": match.group(1)} if match else {}
 
 
