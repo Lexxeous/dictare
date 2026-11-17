@@ -59,6 +59,7 @@ class AudioManager:
         self._device_change_lock = threading.Lock()
         self._device_change_reasons: set[str] = set()
         self._sleeping = False
+        self._input_suspended = False
 
         # Audio components
         self._audio: AudioCapture | None = None
@@ -210,6 +211,8 @@ class AudioManager:
         self,
         should_process: Callable[[], bool],
         is_running: Callable[[], bool],
+        *,
+        suspended: bool = False,
     ) -> None:
         """Start audio streaming.
 
@@ -222,13 +225,17 @@ class AudioManager:
         from dictare.audio.beep import set_audio_control_executor
 
         set_audio_control_executor(self._execute_audio_lifecycle)
-        self._control.execute("start_input", self._start_streaming_owned)
+        def start_owned() -> None:
+            self._input_suspended = suspended
+            self._start_streaming_owned()
+
+        self._control.execute("start_input", start_owned)
         if self._device_monitor:
             self._device_monitor.start()
 
     def _start_streaming_owned(self) -> None:
         """Open the input stream on the audio control owner thread."""
-        if self._audio:
+        if self._audio and not self._input_suspended:
             self._audio.start_streaming(self.on_audio_chunk)
             if not self._audio.wait_for_audio(timeout_s=2.0):
                 logger.error("Initial input stream opened but delivered no audio callbacks")
@@ -265,6 +272,35 @@ class AudioManager:
             if self._audio.is_recording():
                 self._audio.stop_recording()
             self._audio.stop_streaming()
+
+    def suspend_input(self) -> None:
+        """Close input on its owner and prevent device recovery reopening it."""
+        def suspend_owned() -> None:
+            self._input_suspended = True
+            self._stop_streaming_owned()
+
+        self._control.execute("suspend_input", suspend_owned)
+
+    def resume_input(self) -> None:
+        """Reopen a suspended input on its owner; fail closed if it fails."""
+        def resume_owned() -> None:
+            if not self._input_suspended:
+                return
+            if self._sleeping:
+                raise RuntimeError("Cannot resume input while the system is asleep")
+            self._input_suspended = False
+            try:
+                if self._audio is None:
+                    self._restart_input_stream()
+                    if self._audio is None:
+                        raise RuntimeError("Could not reopen audio input")
+                else:
+                    self._start_streaming_owned()
+            except Exception:
+                self._input_suspended = True
+                raise
+
+        self._control.execute("resume_input", resume_owned)
 
     def _close_audio_owned(self) -> None:
         """Close output and input lifecycle resources on the owner thread."""
@@ -451,6 +487,8 @@ class AudioManager:
         Creates a new AudioCapture with current config and starts streaming.
         Call this after _reinit_portaudio() to resume audio capture.
         """
+        if self._input_suspended:
+            return
         device = self._config.input_device or self._config.advanced.device
         try:
             self._audio = AudioCapture(
@@ -579,6 +617,8 @@ class AudioManager:
     @property
     def reconnect_reason(self) -> str | None:
         """Why audio needs reconnection, or None if healthy."""
+        if self._input_suspended:
+            return None
         if self._audio is None:
             # Audio object destroyed by a previous failed reconnect —
             # must try again (e.g. after wake from sleep).
@@ -606,6 +646,8 @@ class AudioManager:
 
     def _reconnect_owned(self, on_chunk_callback: Callable[[Any], None]) -> bool:
         """Perform a full reconnect transaction on the owner thread."""
+        if self._input_suspended:
+            return False
         import sounddevice as sd
 
         # Circuit breaker: too many reconnects in window?
