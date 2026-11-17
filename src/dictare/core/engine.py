@@ -219,7 +219,7 @@ class DictareEngine:
         self._voice_muted = False
         self._voice_mute_error: str | None = None
         self._voice_mute_pending = False
-        # Separate from standard voice mute; not yet exposed in the UI.
+        # Strict mute is separate from standard voice mute and is available on Home.
         self._strict_muted = False
         self._strict_audio_error: str | None = None
         self._strict_transitioning = False
