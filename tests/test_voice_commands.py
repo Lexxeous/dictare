@@ -19,7 +19,7 @@ from tests.test_http_server_extra import MockController, MockEngine
 
 
 def personal_config() -> Config:
-    config = Config(voice_commands=VoiceCommandsConfig(enabled=True, mute="Genni mute", listen="Genni listen", send="Dictare send"))
+    config = Config(voice_commands=VoiceCommandsConfig(enabled=True, mute="Dictare mute", listen="Dictare listen", send="Dictare send"))
     config.pipeline.agent_filter.enabled = False
     return config
 
@@ -35,11 +35,11 @@ def test_custom_send_consumes_command_in_any_detected_language():
 
 def test_custom_mute_and_listen_are_consumed_as_control_actions():
     engine = DictareEngine(personal_config(), hotkey_enabled=False)
-    muted = engine._pipeline.process(create_message("Genni mute"))
+    muted = engine._pipeline.process(create_message("Dictare mute"))
     assert muted[0]["x_mute"]["action"] == "mute"
     assert muted[0]["text"] == ""
     engine._voice_muted = True
-    resumed = engine._pipeline.process(create_message("Genni listen"))
+    resumed = engine._pipeline.process(create_message("Dictare listen"))
     assert resumed[0]["x_mute"]["action"] == "unmute"
     assert resumed[0]["text"] == ""
 
@@ -68,15 +68,15 @@ def test_personal_mode_does_not_enable_a_disabled_master_pipeline():
 def test_personal_phrases_appear_in_stt_hotwords():
     engine = DictareEngine(personal_config(), hotkey_enabled=False)
     words = engine._collect_pipeline_trigger_words()
-    assert {"genni", "dictare", "mute", "listen", "send"} <= words
+    assert {"dictare", "mute", "listen", "send"} <= words
 
 
 def test_phrase_case_punctuation_accents_and_duplicates_use_existing_normalizer():
-    commands = VoiceCommandsConfig(mute="Génni, MUTE!\ngenni mute", listen="Genni listen", send="Genni send")
-    assert commands.patterns("mute") == {"*": [["genni", "mute"]]}
+    commands = VoiceCommandsConfig(mute="Díctare, MUTE!\ndictare mute", listen="Dictare listen", send="Dictare send")
+    assert commands.patterns("mute") == {"*": [["dictare", "mute"]]}
 
 
-@pytest.mark.parametrize("mute,send", [("Genni send", "genni send"), ("send", "Genni send"), ("genni please send", "genni send")])
+@pytest.mark.parametrize("mute,send", [("Dictare send", "dictare send"), ("send", "Dictare send"), ("dictare please send", "dictare send")])
 def test_overlapping_actions_are_rejected(mute, send):
     with pytest.raises(ValueError, match="overlap"):
         VoiceCommandsConfig(mute=mute, send=send)
@@ -93,17 +93,17 @@ def test_atomic_swap_preserves_comments_and_language_patterns(tmp_path, monkeypa
     path.write_text('# Keep private choices\n[pipeline.mute_filter.mute_triggers]\nes = [["vale", "silencio"]] # Custom language\n')
     monkeypatch.setenv("DICTARE_CONFIG_PATH", str(path))
     original_patterns = load_config(path).pipeline.model_dump()
-    set_config_values({"voice_commands.enabled": "true", "voice_commands.mute": "Genni mute", "voice_commands.listen": "Genni listen", "voice_commands.send": "Genni send"}, path)
+    set_config_values({"voice_commands.enabled": "true", "voice_commands.mute": "Dictare mute", "voice_commands.listen": "Dictare listen", "voice_commands.send": "Dictare send"}, path)
     original = path.read_bytes()
     with pytest.raises(ValueError, match="overlap"):
-        set_config_value("voice_commands.mute", "Genni send", path)
+        set_config_value("voice_commands.mute", "Dictare send", path)
     assert path.read_bytes() == original
     client = TestClient(OpenVIPServer(MockEngine(), MockController(), port=0)._app)
-    result = client.post("/api/settings", json={"values": {"voice_commands.mute": "Genni send", "voice_commands.send": "Genni mute"}})
+    result = client.post("/api/settings", json={"values": {"voice_commands.mute": "Dictare send", "voice_commands.send": "Dictare mute"}})
     assert result.status_code == 200
     config = load_config(path)
-    assert config.voice_commands.mute == "Genni send"
-    assert config.voice_commands.send == "Genni mute"
+    assert config.voice_commands.mute == "Dictare send"
+    assert config.voice_commands.send == "Dictare mute"
     assert config.pipeline.model_dump() == original_patterns
     assert "# Keep private choices" in path.read_text()
     assert "# Custom language" in path.read_text()
@@ -122,7 +122,7 @@ def test_invalid_personal_command_returns_readable_error_without_config_dump(tmp
     assert path.read_text() == 'editor = "private-editor-value"\n'
 
 
-@pytest.mark.parametrize("environment_phrase", [None, "Genni mute"])
+@pytest.mark.parametrize("environment_phrase", [None, "Dictare mute"])
 def test_schema_exposes_effective_phrases_even_when_generic_string_fields_are_blank(tmp_path, monkeypatch, environment_phrase):
     path = tmp_path / "config.toml"
     path.write_text("")

@@ -1004,8 +1004,8 @@ claim_key = "ctrl+\\\\"              # Hotkey to claim this agent (ctrl+\\, ctrl
 
 [voice_commands]
 # enabled = false                # Enable personal phrases in the Commands page
-# mute = "Genni mute"           # Complete phrases; one per line for multiple phrases
-# listen = "Genni listen"
+# mute = "Dictare mute"           # Complete phrases; one per line for multiple phrases
+# listen = "Dictare listen"
 # send = "Dictare send"
 # Existing advanced patterns below are kept when personal commands are enabled.
 

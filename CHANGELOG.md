@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guidance and explicit handling of unconfirmed shutdown requests.
 
 ### Fixed
+- Make desktop navigation collapsible, widen settings content, move appearance
+  controls to General, and place whole-engine shutdown at the bottom of Home.
+- Use Dictare examples for personal voice commands throughout the project.
 - Compact the logo/version header and use icon-only mobile menu controls, with
   scrolling navigation that opens from the top over the active settings page.
 - Reject canceled capture jobs, results and watchdog events after Discard or a

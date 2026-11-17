@@ -2,8 +2,7 @@
 	import { untrack } from "svelte";
 	import type { TabDef } from "$lib/types";
 	import { Separator } from "$lib/components/ui/separator";
-	import { ChevronRight, Sun, Moon, Monitor, Menu, X } from "lucide-svelte";
-	import { getTheme, setTheme, type Theme } from "$lib/stores/theme.svelte";
+	import { ChevronRight, Menu, X } from "lucide-svelte";
 	import { getFixedBottomPx } from "$lib/stores/settings.svelte";
 
 	interface Props {
@@ -17,6 +16,7 @@
 	/** Set of expanded parent IDs (expandable tabs whose children are visible). */
 	let expanded = $state<Set<string>>(new Set());
 	let mobileOpen = $state(false);
+	let desktopCollapsed = $state(false);
 	let navigation: HTMLElement;
 	let menuButton: HTMLButtonElement;
 
@@ -84,9 +84,9 @@
 	}}
 />
 
-<nav bind:this={navigation} aria-label="Settings navigation" style="--settings-bottom: {getFixedBottomPx()}px" class="relative z-30 w-full sm:w-52 shrink-0 border-b sm:border-b-0 sm:border-r bg-background sm:bg-background/50 sm:h-screen sm:overflow-y-auto p-3 flex flex-col">
+<nav bind:this={navigation} aria-label="Settings navigation" style="--settings-bottom: {getFixedBottomPx()}px" class="relative z-30 w-full {desktopCollapsed ? 'sm:w-16' : 'sm:w-52'} shrink-0 border-b sm:border-b-0 sm:border-r bg-background sm:bg-background/50 sm:h-screen sm:overflow-y-auto p-3 flex flex-col">
 	<div class="flex items-center justify-between gap-2">
-		<button aria-label="Dictare Home" onclick={() => selectLeaf("home")} class="min-w-0 flex-1 px-3 py-2 text-left rounded-md focus-visible:ring-2 focus-visible:ring-ring">
+		<button aria-label="Dictare Home" onclick={() => selectLeaf("home")} class="{desktopCollapsed ? 'sm:hidden' : ''} min-w-0 flex-1 px-3 py-2 text-left rounded-md focus-visible:ring-2 focus-visible:ring-ring">
 			<span class="flex items-center gap-2">
 				<svg aria-hidden="true" class="shrink-0" width="24" height="24" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
 					<rect x="0" y="0" width="100" height="100" rx="22" fill="#6d5ce6"/>
@@ -106,8 +106,11 @@
 		<button bind:this={menuButton} class="sm:hidden shrink-0 flex size-10 items-center justify-center rounded-md border focus-visible:ring-2 focus-visible:ring-ring" aria-label={mobileOpen ? "Close settings menu" : "Open settings menu"} aria-expanded={mobileOpen} aria-controls="settings-pages" onclick={() => mobileOpen = !mobileOpen}>
 			{#if mobileOpen}<X aria-hidden="true" class="size-4" />{:else}<Menu aria-hidden="true" class="size-4" />{/if}
 		</button>
+		<button class="hidden sm:flex shrink-0 size-10 items-center justify-center rounded-md border focus-visible:ring-2 focus-visible:ring-ring" aria-label={desktopCollapsed ? "Open settings menu" : "Close settings menu"} aria-expanded={!desktopCollapsed} aria-controls="settings-pages" onclick={() => desktopCollapsed = !desktopCollapsed}>
+			{#if desktopCollapsed}<Menu aria-hidden="true" class="size-4" />{:else}<X aria-hidden="true" class="size-4" />{/if}
+		</button>
 	</div>
-	<div id="settings-pages" class="{mobileOpen ? 'flex' : 'hidden'} absolute inset-x-0 top-full max-h-[calc(100dvh-6rem-var(--settings-bottom))] overflow-y-auto border-b bg-background p-3 shadow-lg sm:static sm:max-h-none sm:overflow-visible sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:flex flex-col sm:flex-1">
+	<div id="settings-pages" class="{mobileOpen ? 'flex' : 'hidden'} {desktopCollapsed ? 'sm:hidden' : 'sm:flex'} absolute inset-x-0 top-full max-h-[calc(100dvh-6rem-var(--settings-bottom))] overflow-y-auto border-b bg-background p-3 shadow-lg sm:static sm:max-h-none sm:overflow-visible sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none flex-col sm:flex-1">
 	<Separator class="hidden sm:block mb-3" />
 
 	<div class="space-y-0.5">
@@ -161,22 +164,6 @@
 				</button>
 			{/if}
 		{/each}
-	</div>
-	<div class="mt-3 sm:mt-auto pt-3 border-t border-border/60">
-		<div class="flex items-center justify-center gap-1 p-1 rounded-lg bg-muted/50">
-			{#each [{ t: "light" as Theme, Icon: Sun }, { t: "system" as Theme, Icon: Monitor }, { t: "dark" as Theme, Icon: Moon }] as { t, Icon }}
-				<button
-					onclick={() => setTheme(t)}
-					class="flex-1 flex items-center justify-center py-1.5 rounded-md transition-colors
-						{getTheme() === t
-							? 'bg-background text-foreground shadow-sm ring-1 ring-border'
-							: 'text-muted-foreground hover:text-foreground'}"
-					title={t.charAt(0).toUpperCase() + t.slice(1)}
-				>
-					<Icon class="size-3.5" />
-				</button>
-			{/each}
-		</div>
 	</div>
 	</div>
 </nav>

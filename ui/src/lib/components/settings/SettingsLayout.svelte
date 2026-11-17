@@ -4,6 +4,7 @@
 	import SaveBar from "./SaveBar.svelte";
 	import EngineStatusBar from "./EngineStatusBar.svelte";
 	import EngineStopControl from "./EngineStopControl.svelte";
+	import { getTheme, setTheme, type Theme } from "$lib/stores/theme.svelte";
 	import DashboardPage from "$lib/components/dashboard/DashboardPage.svelte";
 	import HomePage from "$lib/components/home/HomePage.svelte";
 	import VoiceCommands from "./VoiceCommands.svelte";
@@ -184,8 +185,7 @@
 <div class="flex h-screen flex-col sm:flex-row">
 	<SettingsNav {tabs} bind:activeNavId version={schema?.version ?? ""} />
 	<main class="min-w-0 min-h-0 flex-1 overflow-y-auto" style="padding-bottom: {fixedBottomPx}px">
-		<div class="max-w-2xl mx-auto pt-6 sm:pt-14 pb-8">
-			<EngineStopControl />
+		<div class="max-w-[50rem] mx-auto pt-6 sm:pt-14 pb-8">
 			{#if activeNavId === "home" || activeNavId === "documentation"}
 				<div class="px-4 mb-8">
 					<h2 class="text-xl font-semibold mb-1.5">{activeLabel}</h2>
@@ -193,6 +193,7 @@
 				</div>
 				{#if activeNavId === "home"}
 					<HomePage />
+					<div class="mt-8"><EngineStopControl /></div>
 				{:else}
 					{#await import("../home/DocumentationPage.svelte") then page}
 						<page.default />
@@ -224,6 +225,16 @@
 					<p class="text-sm text-muted-foreground">{activeDesc}</p>
 				</div>
 			{#if activeNavId === "general"}
+					<div class="px-4 mb-6">
+						<div class="rounded-lg border px-4 py-3 space-y-3">
+							<p class="text-sm font-medium">Appearance</p>
+							<div role="group" aria-label="Appearance" class="flex flex-wrap gap-2">
+								{#each ["light", "system", "dark"] as choice}
+									<button class="rounded-md border px-3 py-2 text-sm {getTheme() === choice ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'}" aria-pressed={getTheme() === choice} onclick={() => setTheme(choice as Theme)}>{choice.charAt(0).toUpperCase() + choice.slice(1)}</button>
+								{/each}
+							</div>
+						</div>
+					</div>
 					{#if launchAtLogin !== null}
 						<div class="px-4 mb-6">
 							<div class="flex items-center justify-between rounded-lg border px-4 py-3">

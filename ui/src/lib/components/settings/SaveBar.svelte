@@ -14,7 +14,7 @@
 		class="fixed left-0 right-0 border-t bg-background/95 backdrop-blur px-6 py-3 z-50 transition-[bottom] duration-200"
 		style="bottom: {engineBarVisible ? 44 : 0}px"
 	>
-		<div class="max-w-2xl mx-auto flex items-center justify-end gap-3">
+		<div class="max-w-[50rem] mx-auto flex items-center justify-end gap-3">
 			{#if status === "error"}
 				<span class="text-sm text-destructive mr-auto">Some fields had errors</span>
 			{/if}
