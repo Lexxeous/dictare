@@ -209,7 +209,7 @@ class TrayApp:
         elif self._state == "disconnected":
             status_text = "Disconnected"
         else:
-            state_display = "OFF" if self._state == "off" else self._state.upper()
+            state_display = "STRICT MUTE" if self._state == "strict_muted" else ("OFF" if self._state == "off" else self._state.upper())
             status_text = state_display
 
         items = [
@@ -236,7 +236,9 @@ class TrayApp:
         items.append(pystray.Menu.SEPARATOR)
 
         # Start/Stop listening toggle
-        if self._state == "listening":
+        if self._state == "strict_muted":
+            items.append(pystray.MenuItem("Resume with hotkey", None))
+        elif self._state == "listening":
             items.append(
                 pystray.MenuItem("Stop Listening", self._on_toggle_listening)
             )
@@ -608,6 +610,7 @@ class TrayApp:
                 "loading": "dictare_loading",
                 "off": "dictare",
                 "muted": "dictare",
+                "strict_muted": "dictare",
                 "listening": "dictare_active",
                 "recording": "dictare_active",
             }.get(self._state, "dictare_disconnected")
@@ -624,6 +627,7 @@ class TrayApp:
                 + (f" {self._loading_stage}…" if self._loading_stage else "…"),
                 "off": "Dictare — Off",
                 "muted": "Dictare — Muted",
+                "strict_muted": "Dictare — Strict mute",
                 "listening": "Dictare — Listening",
                 "recording": "Dictare — Recording",
             }

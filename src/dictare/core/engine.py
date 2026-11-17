@@ -220,6 +220,7 @@ class DictareEngine:
         # Separate from standard voice mute; not yet exposed in the UI.
         self._strict_muted = False
         self._strict_audio_error: str | None = None
+        self._strict_transitioning = False
         self._strict_mute_transition_lock = threading.Lock()
         self._capture_generation = 0  # Independent of hung-worker recovery.
 
@@ -1327,6 +1328,7 @@ class DictareEngine:
                 if self._strict_muted:
                     return
                 self._strict_muted = True
+                self._strict_transitioning = True
                 self._strict_audio_error = None
                 try:
                     # Revoke worker permits before waiting for VAD or device
@@ -1352,6 +1354,7 @@ class DictareEngine:
                 except Exception:
                     self._strict_audio_error = "Could not close the microphone input."
                     logger.exception("Could not close strict-muted input")
+            self._strict_transitioning = False
             self._notify_status()
 
     def resume_strict_mute(self) -> None:

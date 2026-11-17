@@ -8,7 +8,7 @@ from __future__ import annotations
 
 # All valid engine display states (as returned by get_status platform.state).
 ENGINE_DISPLAY_STATES = frozenset(
-    {"off", "listening", "recording", "transcribing", "playing", "muted"}
+    {"off", "listening", "recording", "transcribing", "playing", "muted", "strict_muted"}
 )
 
 # UI-only states (not from engine, set by client-side logic).
@@ -48,7 +48,9 @@ def resolve_display_state(
         current = platform.get("output", {}).get("current_agent")
         is_active = current == agent_id
 
-        if is_active and engine_state == "muted":
+        if is_active and engine_state == "strict_muted":
+            return ("strict_muted", "dim")
+        elif is_active and engine_state == "muted":
             return ("muted", "dim")
         elif is_active and engine_state == "recording":
             return ("recording", "ok")
@@ -61,7 +63,9 @@ def resolve_display_state(
         else:
             return ("standby", "dim")
     else:
-        if engine_state == "muted":
+        if engine_state == "strict_muted":
+            return ("strict_muted", "dim")
+        elif engine_state == "muted":
             return ("muted", "dim")
         elif engine_state == "recording":
             return ("recording", "ok")

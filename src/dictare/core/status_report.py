@@ -49,7 +49,9 @@ def build_status(engine: DictareEngine) -> dict:
     stt_state = state_map.get(engine.state, "off")
 
     # Voice muted overrides the displayed state
-    if engine._voice_muted and stt_state in {"listening", "recording", "transcribing"}:
+    if engine._strict_muted:
+        stt_state = "strict_muted"
+    elif engine._voice_muted and stt_state in {"listening", "recording", "transcribing"}:
         stt_state = "muted"
 
     uptime = (
@@ -58,7 +60,7 @@ def build_status(engine: DictareEngine) -> dict:
         else 0
     )
 
-    stt_active = stt_state not in ("off",)
+    stt_active = stt_state not in ("off", "strict_muted")
 
     return {
         # OpenVIP protocol-level fields
@@ -72,6 +74,8 @@ def build_status(engine: DictareEngine) -> dict:
             "version": __version__,
             "mode": "agents" if engine.agent_mode else "keyboard",
             "state": stt_state,
+            "strict_mute_pending": engine._strict_transitioning,
+            "strict_mute_error": engine._strict_audio_error,
             "uptime_seconds": uptime,
             "stt": {
                 "model_name": engine.config.stt.model,

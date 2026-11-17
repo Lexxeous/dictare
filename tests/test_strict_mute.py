@@ -128,3 +128,23 @@ def test_unconfirmed_worker_interrupt_is_not_silently_marked_safe():
     engine.strict_mute()
     assert engine._strict_muted
     assert "did not confirm" in engine._strict_audio_error
+
+
+def test_status_reports_strict_gate_and_failure_separately(monkeypatch):
+    import dictare.core.status_report as status_report
+    from dictare.status import resolve_display_state
+
+    monkeypatch.setattr(status_report, "audio_devices", lambda: {})
+    monkeypatch.setattr(status_report, "permissions", lambda: {})
+    monkeypatch.setattr(status_report, "hotkey_active", lambda engine: False)
+    monkeypatch.setattr(status_report, "hotkey_status_raw", lambda engine: "unknown")
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine._strict_muted = True
+    engine._strict_transitioning = True
+    engine._strict_audio_error = "Could not close the microphone input."
+    status = engine.get_status()
+    assert status["stt"]["active"] is False
+    assert status["platform"]["state"] == "strict_muted"
+    assert status["platform"]["strict_mute_pending"] is True
+    assert status["platform"]["strict_mute_error"] == "Could not close the microphone input."
+    assert resolve_display_state(status["platform"]) == ("strict_muted", "dim")
