@@ -699,6 +699,14 @@ class DictareEngine:
             capture_generation is None or capture_generation == self._capture_generation
         )
 
+    def _should_process_capture(self) -> bool:
+        """Admit audio only while listening and no review gate is closed."""
+        return (
+            self._state_manager.should_process_audio
+            and self.capture_allowed()
+            and (not self.agent_mode or bool(self.visible_agents))
+        )
+
     def transcribe_and_process(self, audio_data: Any, agent: Agent | None = None, capture_generation: int | None = None) -> None:
         """Queue audio for transcription on the dedicated STT worker.
 
@@ -1678,10 +1686,7 @@ class DictareEngine:
         _t0 = time.monotonic()
         if self.audio_manager:
             self.audio_manager.start_streaming(
-                should_process=lambda: (
-                    self._state_manager.should_process_audio
-                    and (not self.agent_mode or bool(self.visible_agents))
-                ),
+                should_process=self._should_process_capture,
                 is_running=lambda: self.running,
             )
         _audio_ms = (time.monotonic() - _t0) * 1000

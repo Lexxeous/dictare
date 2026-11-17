@@ -569,6 +569,9 @@ class AudioManager:
         # Use lock to prevent race condition with close()
         # This ensures VAD isn't deleted while we're using it
         with self._vad_lock:
+            # The gate may close while this callback waits for the VAD owner.
+            if not (self.is_engine_running and self.should_process_audio):
+                return
             streaming_vad = self._streaming_vad
             if streaming_vad:
                 streaming_vad.process_chunk(chunk)

@@ -86,3 +86,58 @@ def test_submit_only_command_does_not_create_a_review_draft():
     engine.inject_text("send command", agent=target)
     assert engine.review_snapshot() is None
     target.send.assert_called_once()
+
+
+def test_pending_review_stops_audio_before_vad():
+    import numpy as np
+
+    from dictare.core.audio_manager import AudioManager
+    from dictare.core.prompt_review import UnavailableReviewAgent
+
+    config = Config()
+    config.output.mode = "keyboard"
+    engine = DictareEngine(config, hotkey_enabled=False)
+    engine._state_manager.transition(AppState.LISTENING, force=True)
+    audio = AudioManager(config.audio)
+    audio._streaming_vad = Mock()
+    audio._is_running_check = lambda: True
+    audio._should_process_check = engine._should_process_capture
+    audio.on_audio_chunk(np.zeros(512))
+    audio._streaming_vad.process_chunk.assert_called_once()
+    engine._review_slot.hold(UnavailableReviewAgent("keyboard"), [{"text": "pending"}])
+    audio._streaming_vad.process_chunk.reset_mock()
+    audio.on_audio_chunk(np.zeros(512))
+    audio._streaming_vad.process_chunk.assert_not_called()
+
+
+def test_audio_that_waited_for_vad_lock_is_rechecked_after_review_starts():
+    import threading
+
+    import numpy as np
+
+    from dictare.core.audio_manager import AudioManager
+    from dictare.core.prompt_review import UnavailableReviewAgent
+
+    config = Config()
+    config.output.mode = "keyboard"
+    engine = DictareEngine(config, hotkey_enabled=False)
+    engine._state_manager.transition(AppState.LISTENING, force=True)
+    audio = AudioManager(config.audio)
+    audio._streaming_vad = Mock()
+    audio._is_running_check = lambda: True
+    checked = threading.Event()
+
+    def check():
+        result = engine._should_process_capture()
+        checked.set()
+        return result
+
+    audio._should_process_check = check
+    with audio._vad_lock:
+        worker = threading.Thread(target=audio.on_audio_chunk, args=(np.zeros(512),))
+        worker.start()
+        assert checked.wait(timeout=2)
+        engine._review_slot.hold(UnavailableReviewAgent("keyboard"), [{"text": "pending"}])
+    worker.join(timeout=2)
+    assert not worker.is_alive()
+    audio._streaming_vad.process_chunk.assert_not_called()
