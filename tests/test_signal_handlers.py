@@ -104,15 +104,14 @@ class TestHotkeyEntryPoints:
         """SIGUSR1 during model load must not crash the process."""
         controller.on_hotkey_tap()  # Must not raise
 
-    def test_tap_feeds_key_down_then_key_up(self, controller: AppController) -> None:
-        """A tap simulates a complete press through the TapDetector."""
+    def test_tap_forwards_to_engine(self, controller: AppController) -> None:
+        """A tap is forwarded to the engine's legacy tap entry point."""
         engine = MagicMock()
         controller._engine = engine
 
         controller.on_hotkey_tap()
 
-        engine.tap_detector.on_key_down.assert_called_once_with()
-        engine.tap_detector.on_key_up.assert_called_once_with()
+        engine.hotkey_tap.assert_called_once_with()
 
     def test_key_down_and_up_without_engine_are_noop(
         self, controller: AppController
@@ -123,18 +122,18 @@ class TestHotkeyEntryPoints:
         controller.on_hotkey_other_key()
         controller.on_hotkey_combo()  # Must not raise
 
-    def test_key_down_and_up_forward_to_tap_detector(
+    def test_key_down_and_up_forward_to_engine(
         self, controller: AppController
     ) -> None:
-        """IPC key.down / key.up feed the raw events into TapDetector."""
+        """IPC key.down / key.up reach the engine's raw event entry points."""
         engine = MagicMock()
         controller._engine = engine
 
         controller.on_hotkey_key_down()
-        engine.tap_detector.on_key_down.assert_called_once_with()
+        engine.hotkey_down.assert_called_once_with()
 
         controller.on_hotkey_key_up()
-        engine.tap_detector.on_key_up.assert_called_once_with()
+        engine.hotkey_up.assert_called_once_with()
 
     def test_other_key_cancels_pending_tap(self, controller: AppController) -> None:
         """A combo key while the hotkey is held cancels tap detection."""
@@ -142,7 +141,7 @@ class TestHotkeyEntryPoints:
         controller._engine = engine
 
         controller.on_hotkey_other_key()
-        engine.tap_detector.on_other_key.assert_called_once_with()
+        engine.hotkey_other_key.assert_called_once_with()
 
     def test_combo_toggles_mode(self, controller: AppController) -> None:
         """The mode-switch combo toggles agent/keyboard mode."""

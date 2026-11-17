@@ -65,3 +65,19 @@ def test_failed_start_and_invalid_timeout_do_not_leave_a_hold_active():
         assert not gate.active
         assert not gate.release()
         assert ends == ["cancelled"]
+
+
+def test_engine_hotkey_entry_points_preserve_existing_tap_behavior():
+    from unittest.mock import MagicMock, call
+
+    from dictare.config import Config
+    from dictare.core.engine import DictareEngine
+
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    detector = MagicMock()
+    engine.tap_detector = detector
+    engine.hotkey_tap()
+    engine.hotkey_down()
+    engine.hotkey_up()
+    engine.hotkey_other_key()
+    assert detector.mock_calls == [call.on_key_down(), call.on_key_up(), call.on_key_down(), call.on_key_up(), call.on_other_key()]

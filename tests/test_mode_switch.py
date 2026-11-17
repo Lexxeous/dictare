@@ -120,10 +120,10 @@ class TestOnHotkeyCombo:
         ctrl.on_hotkey_combo()
 
     def test_normal_tap_unaffected(self) -> None:
-        """Normal on_hotkey_key_down still calls TapDetector, not toggle_mode."""
+        """Normal on_hotkey_key_down reaches the engine, not toggle_mode."""
         ctrl = self._make_controller(agent_mode=True)
         ctrl.on_hotkey_key_down()
-        ctrl._engine.tap_detector.on_key_down.assert_called_once()
+        ctrl._engine.hotkey_down.assert_called_once()
         ctrl._engine.toggle_mode.assert_not_called()
 
 # ---------------------------------------------------------------------------

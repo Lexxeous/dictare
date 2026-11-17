@@ -1174,6 +1174,23 @@ class DictareEngine:
     # Hotkey Actions
     # -------------------------------------------------------------------------
 
+    def hotkey_tap(self) -> None:
+        """Handle the legacy transport's complete tap event."""
+        self.tap_detector.on_key_down()
+        self.tap_detector.on_key_up()
+
+    def hotkey_down(self) -> None:
+        """Handle a physical press from a listener or the launcher."""
+        self.tap_detector.on_key_down()
+
+    def hotkey_up(self) -> None:
+        """Handle a physical release from a listener or the launcher."""
+        self.tap_detector.on_key_up()
+
+    def hotkey_other_key(self) -> None:
+        """Cancel a tap when the shortcut is part of another key combination."""
+        self.tap_detector.on_other_key()
+
     def _hotkey_context(self) -> tuple[str, bool, str | None, bool | None]:
         """Return current hotkey context for gesture/submit diagnostics."""
         state = self._state_manager.state.name
@@ -1816,9 +1833,9 @@ class DictareEngine:
         # Start hotkey listener (tap detector handles single/double tap)
         if self._hotkey:
             self._hotkey.start(
-                on_press=self.tap_detector.on_key_down,
-                on_release=self.tap_detector.on_key_up,
-                on_other_key=self.tap_detector.on_other_key,
+                on_press=self.hotkey_down,
+                on_release=self.hotkey_up,
+                on_other_key=self.hotkey_other_key,
                 on_combo=self.toggle_mode,
             )
 

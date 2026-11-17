@@ -107,8 +107,7 @@ class TestAppCommandsWithEngine:
         ctrl = AppController(_make_config())
         ctrl._engine = _make_engine()
         ctrl.on_hotkey_tap()
-        ctrl._engine.tap_detector.on_key_down.assert_called_once()
-        ctrl._engine.tap_detector.on_key_up.assert_called_once()
+        ctrl._engine.hotkey_tap.assert_called_once()
 
     def test_on_hotkey_combo(self) -> None:
         ctrl = AppController(_make_config())

@@ -432,8 +432,7 @@ class AppController:
             logger.debug("hotkey: tap event ignored reason=no_engine")
             return
         logger.debug("hotkey: tap event received transport=fallback")
-        self._engine.tap_detector.on_key_down()
-        self._engine.tap_detector.on_key_up()
+        self._engine.hotkey_tap()
 
     def on_hotkey_key_down(self) -> None:
         """Called when the hotkey key is pressed down (IPC key.down event).
@@ -445,7 +444,7 @@ class AppController:
             logger.debug("hotkey: key_down ignored reason=no_engine")
             return
         logger.debug("hotkey: key_down received")
-        self._engine.tap_detector.on_key_down()
+        self._engine.hotkey_down()
 
     def on_hotkey_key_up(self) -> None:
         """Called when the hotkey key is released (IPC key.up event)."""
@@ -453,7 +452,7 @@ class AppController:
             logger.debug("hotkey: key_up ignored reason=no_engine")
             return
         logger.debug("hotkey: key_up received")
-        self._engine.tap_detector.on_key_up()
+        self._engine.hotkey_up()
 
     def on_hotkey_other_key(self) -> None:
         """Called when another key is pressed while the hotkey modifier is held.
@@ -465,7 +464,7 @@ class AppController:
             logger.debug("hotkey: other_key ignored reason=no_engine")
             return
         logger.debug("hotkey: other_key received")
-        self._engine.tap_detector.on_other_key()
+        self._engine.hotkey_other_key()
 
     def on_hotkey_combo(self) -> None:
         """Called when the mode-switch combo is pressed (modifier + hotkey).
