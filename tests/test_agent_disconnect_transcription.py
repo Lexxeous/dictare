@@ -47,6 +47,9 @@ class RecordingEngine:
     def inject_text(self, text: str, agent: Any = None, language: str | None = None) -> None:
         self.injections.append((text, agent, language))
 
+    def capture_allowed(self, generation: int | None = None) -> bool:
+        return True
+
     def process_queued_audio(self) -> None:
         pass
 

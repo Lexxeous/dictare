@@ -42,6 +42,10 @@ boundaries. Keep those documents aligned with the implementation.
   actions together, and display effective saved defaults rather than the
   generic schema's intentionally blank unset string fields. Do not expose
   unrelated configuration values in validation errors.
+- Keep capture lifetime separate from recognition-worker recovery. Carry capture
+  identity through VAD/jobs/completions/timeouts and check it before side effects.
+  Reset VAD before advancing capture generation; never acquire the delivery lock
+  from a VAD callback holding the VAD lock. See ARCHITECTURE.md for ownership.
 - Do not add dependencies for a small local change. For substantial new
   functionality, review existing project code and maintained library options,
   then record any material adoption decision in the appropriate documentation.
