@@ -123,7 +123,7 @@
 						? 'rgb(69 10 10 / 0.9)'
 						: 'rgb(29 20 66 / 0.9)'};"
 	>
-		<div class="max-w-2xl mx-auto flex items-center justify-center gap-2 py-2.5 px-6">
+		<div class="max-w-[50rem] mx-auto flex items-center justify-center gap-2 py-2.5 px-6">
 			{#if barState === "stopped"}
 				<CheckCircle class="size-3.5 shrink-0" />
 				<span role="status" class="text-sm">Dictare stopped. Start it from the tray or your usual launcher, then reload this page.</span>

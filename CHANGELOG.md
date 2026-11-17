@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guidance and explicit handling of unconfirmed shutdown requests.
 
 ### Fixed
+- Wrap the sidebar version label and remove its divider while collapsed. Add
+  one-click copy controls to the bundled documentation's code blocks.
+- Make desktop navigation collapsible, widen settings content, move appearance
+  controls to General, and place whole-engine shutdown at the bottom of Home.
+- Use Dictare examples for personal voice commands throughout the project.
+- Compact the logo/version header and use icon-only mobile menu controls, with
+  scrolling navigation that opens from the top over the active settings page.
 - Reject canceled capture jobs, results and watchdog events after Discard or a
   completed Stop, preventing late text or state changes after listening resumes.
 - Clear outdated settings validation errors when correcting or retrying a save,

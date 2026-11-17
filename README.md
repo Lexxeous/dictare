@@ -224,7 +224,7 @@ dictare service logs        # View recent logs
 dictare service uninstall   # Remove the service
 ```
 
-The local settings page has a **Stop Dictare** control. It asks for confirmation
+The bottom of the settings **Home** page has a **Stop Dictare** control. It asks for confirmation
 and requests a clean engine shutdown, distinct from stopping listening. The
 page reports when the engine disconnects and explains how to start it again
 from the tray or usual launcher. Launch-at-login preferences are unchanged.
@@ -234,12 +234,15 @@ A lost request connection is reported as unconfirmed rather than as success.
 
 Settings opens on **Home**, with Start listening / Stop listening controls,
 the current destination for your words, and voice-command and keyboard cheat
-sheets. Click the Dictare logo to return Home. On a narrow screen, use Menu
-to open navigation.
+sheets. Click the Dictare logo to return Home. On a narrow screen, use the menu
+icon to open navigation from the top. Select a page, use the close icon, or
+press Escape to close it. On desktop, the same control collapses or expands the
+sidebar. Choose light, system, or dark appearance under General settings.
 
 **Documentation** displays the README included with your installed copy as
 rendered Markdown. Reading it does not require GitHub or an internet connection;
-external links open separately. Remote badges and images appear as descriptions
+use the copy icon on a code block to copy its contents. External links open separately.
+Remote badges and images appear as descriptions
 to avoid loading external resources. Home keeps everyday guidance separate
 from the README's installation and developer reference.
 
@@ -249,8 +252,8 @@ confirmed action that closes the whole engine.
 ## Personal voice commands
 
 Open **Commands** in settings and turn on **Use my voice commands** to choose
-your own complete phrases for Mute, Resume, and Send, such as “Genni mute,”
-“Genni listen,” and “Dictare send.” Enter one phrase per line, then save.
+your own complete phrases for Mute, Resume, and Send, such as “Dictare mute,”
+“Dictare listen,” and “Dictare send.” Enter one phrase per line, then save.
 Home shows the saved phrases. Other speech is still dictated while listening.
 
 Each action accepts 1–32 phrases of 1–10 words. Matching uses the existing

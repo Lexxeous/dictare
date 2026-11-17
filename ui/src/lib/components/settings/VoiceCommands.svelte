@@ -5,8 +5,8 @@
 
 	const defaults = { mute: "ok mute\nok hold on", listen: "ok listen\nok listen up", send: "ok send\nok submit" };
 	const actions = [
-		{ key: "mute", label: "Mute", example: "Genni mute" },
-		{ key: "listen", label: "Resume", example: "Genni listen" },
+		{ key: "mute", label: "Mute", example: "Dictare mute" },
+		{ key: "listen", label: "Resume", example: "Dictare listen" },
 		{ key: "send", label: "Send", example: "Dictare send" }
 	] as const;
 	const enabled = $derived(settingsStore.getValue("voice_commands.enabled") === true);

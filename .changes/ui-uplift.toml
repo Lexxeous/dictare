@@ -1,0 +1,3 @@
+name = "ui-uplift"
+bump = "patch"
+summary = "Compact the settings header and keep mobile navigation from shifting page content."
