@@ -466,12 +466,14 @@ class DictareEngine:
             return None
 
         pipeline = Pipeline()
+        personal = getattr(self.config, "voice_commands", None)
+        use_personal = personal is not None and personal.enabled
 
         # Mute filter must run FIRST — discards all text when muted
-        if cfg.mute_filter.enabled:
+        if cfg.mute_filter.enabled or use_personal:
             pipeline.add_step(MuteFilter(
-                mute_triggers=cfg.mute_filter.mute_triggers,
-                listen_triggers=cfg.mute_filter.listen_triggers,
+                mute_triggers=personal.patterns("mute") if personal is not None and use_personal else cfg.mute_filter.mute_triggers,
+                listen_triggers=personal.patterns("listen") if personal is not None and use_personal else cfg.mute_filter.listen_triggers,
                 is_muted=lambda: self._voice_muted,
                 confidence_threshold=cfg.mute_filter.confidence_threshold,
                 max_scan_words=cfg.mute_filter.max_scan_words,
@@ -488,9 +490,9 @@ class DictareEngine:
             self._agent_mgr.on_unregistered = agent_filter.agent_unregistered
             pipeline.add_step(agent_filter)
 
-        if cfg.submit_filter.enabled:
+        if cfg.submit_filter.enabled or use_personal:
             pipeline.add_step(InputFilter(
-                triggers=cfg.submit_filter.triggers,
+                triggers=personal.patterns("send") if personal is not None and use_personal else cfg.submit_filter.triggers,
                 confidence_threshold=cfg.submit_filter.confidence_threshold,
                 max_scan_words=cfg.submit_filter.max_scan_words,
                 decay_rate=cfg.submit_filter.decay_rate,

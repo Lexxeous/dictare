@@ -475,6 +475,48 @@ class PipelineConfig(BaseModel):
         description="Voice-controlled agent switching filter",
     )
 
+class VoiceCommandsConfig(BaseModel):
+    """Plain phrases compiled into the existing pipeline trigger format."""
+
+    enabled: bool = Field(default=False, description="Use personal voice commands instead of advanced trigger patterns")
+    mute: str = Field(default="ok mute\nok hold on", max_length=2000, description="Mute phrases, one per line")
+    listen: str = Field(default="ok listen\nok listen up", max_length=2000, description="Resume phrases, one per line")
+    send: str = Field(default="ok send\nok submit", max_length=2000, description="Send phrases, one per line")
+
+    def patterns(self, action: Literal["mute", "listen", "send"]) -> dict[str, list[list[str]]]:
+        from dictare.pipeline.filters._text import tokenize
+
+        patterns: list[list[str]] = []
+        for phrase in getattr(self, action).splitlines():
+            if not phrase.strip():
+                continue
+            words = tokenize(phrase)
+            if not words or len(words) > 10:
+                raise ValueError(f"{action}: each phrase needs 1–10 supported words")
+            if words not in patterns:
+                patterns.append(words)
+        if not patterns or len(patterns) > 32:
+            raise ValueError(f"{action}: enter between 1 and 32 phrases")
+        return {"*": patterns}
+
+    @model_validator(mode="after")
+    def validate_phrases(self) -> VoiceCommandsConfig:
+        actions = {"mute": self.patterns("mute")["*"], "listen": self.patterns("listen")["*"], "send": self.patterns("send")["*"]}
+        # Existing matching allows intervening words. Reject another action's
+        # complete phrase being a subsequence, not only exact duplicates.
+        def contains(longer: list[str], shorter: list[str]) -> bool:
+            remaining = iter(longer)
+            return all(any(word == candidate for candidate in remaining) for word in shorter)
+
+        names = list(actions)
+        for index, action in enumerate(names):
+            for other in names[index + 1:]:
+                for phrase in actions[action]:
+                    for candidate in actions[other]:
+                        if contains(phrase, candidate) or contains(candidate, phrase):
+                            raise ValueError(f"{action} and {other} phrases overlap; choose distinct commands")
+        return self
+
 class DaemonConfig(BaseModel):
     """Daemon configuration."""
 
@@ -531,6 +573,7 @@ class Config(BaseModel):
     stats: StatsConfig = Field(default_factory=StatsConfig)
     daemon: DaemonConfig = Field(default_factory=DaemonConfig)
     pipeline: PipelineConfig = Field(default_factory=PipelineConfig)
+    voice_commands: VoiceCommandsConfig = Field(default_factory=VoiceCommandsConfig)
     agent_profiles: AgentProfilesConfig = Field(
         default_factory=AgentProfilesConfig,
         description='Agent profile presets. Set default = "codex" for default profile. Names with dots must be quoted: [agent_profiles."sonnet-4.6"].',
@@ -958,6 +1001,13 @@ claim_key = "ctrl+\\\\"              # Hotkey to claim this agent (ctrl+\\, ctrl
 
 # [daemon]
 # socket_path = ""
+
+[voice_commands]
+# enabled = false                # Enable personal phrases in the Commands page
+# mute = "Genni mute"           # Complete phrases; one per line for multiple phrases
+# listen = "Genni listen"
+# send = "Dictare send"
+# Existing advanced patterns below are kept when personal commands are enabled.
 
 [pipeline]
 # enabled = true

@@ -6,6 +6,7 @@
 	import EngineStopControl from "./EngineStopControl.svelte";
 	import DashboardPage from "$lib/components/dashboard/DashboardPage.svelte";
 	import HomePage from "$lib/components/home/HomePage.svelte";
+	import VoiceCommands from "./VoiceCommands.svelte";
 	import ModelsPage from "$lib/components/models/ModelsPage.svelte";
 	import { Button } from "$lib/components/ui/button";
 	import { RotateCcw, CheckCircle, XCircle } from "lucide-svelte";
@@ -199,6 +200,12 @@
 						<p role="alert" class="px-4">The guide could not be loaded. Reload this page to try again.</p>
 					{/await}
 				{/if}
+			{:else if activeNavId === "commands" && schema}
+				<div class="px-4 mb-8">
+					<h2 class="text-xl font-semibold mb-1.5">{activeLabel}</h2>
+					<p class="text-sm text-muted-foreground">{activeDesc}</p>
+				</div>
+				<VoiceCommands />
 			{:else if activeNavId === "dashboard"}
 				<div class="px-4 mb-8">
 					<h2 class="text-xl font-semibold mb-1.5">{activeLabel}</h2>

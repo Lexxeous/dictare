@@ -4,6 +4,7 @@
 	import { Button } from "$lib/components/ui/button";
 	import { fetchStatus, type StatusResponse } from "$lib/api";
 	import { hotkeyLabel, listeningLabel, setListening } from "$lib/listening";
+	import { getSchema } from "$lib/stores/settings.svelte";
 
 	let status = $state<StatusResponse | null>(null);
 	let error = $state("");
@@ -12,6 +13,11 @@
 	let waitStarted = 0;
 	const active = $derived(status?.stt.active ?? false);
 	const loading = $derived(status?.platform.loading?.active ?? false);
+	const personal = $derived(getSchema()?.voice_commands ?? getSchema()?.values.voice_commands as { enabled?: boolean; mute?: string; listen?: string; send?: string } | undefined);
+	function phrases(action: "mute" | "listen" | "send", fallback: string): string {
+		const value = personal?.[action] || String(getSchema()?.presets[`voice_commands.${action}`]?.default ?? "");
+		return personal?.enabled ? value.split(/\r?\n/).map((phrase) => phrase.trim()).filter(Boolean).map((phrase) => `“${phrase}”`).join(" / ") : fallback;
+	}
 
 	onMount(() => {
 		let disposed = false;
@@ -83,11 +89,11 @@
 	</div>
 	<div class="space-y-3">
 		<h3 class="text-lg">Voice command cheat sheet</h3>
-		<p class="text-sm text-muted-foreground">These are the default English phrases. Your Voice settings may use different commands.</p>
+		<p class="text-sm text-muted-foreground">{personal?.enabled ? "Your saved personal commands. Change them in Commands." : "These are the default English phrases. Advanced settings may use different commands. Choose Commands to set your own."}</p>
 		<dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-			<dt class="font-medium">“OK, send” or “OK, submit”</dt><dd>Send your words to the assistant.</dd>
-			<dt class="font-medium">“OK, mute” or “OK, hold on”</dt><dd>Pause dictation by voice.</dd>
-			<dt class="font-medium">“OK, listen” or “OK, listen up”</dt><dd>Resume dictation after voice mute.</dd>
+			<dt class="font-medium break-words">{phrases("send", "“OK, send” or “OK, submit”")}</dt><dd>Send your words to the assistant.</dd>
+			<dt class="font-medium break-words">{phrases("mute", "“OK, mute” or “OK, hold on”")}</dt><dd>Pause dictation by voice.</dd>
+			<dt class="font-medium break-words">{phrases("listen", "“OK, listen” or “OK, listen up”")}</dt><dd>Resume dictation after voice mute.</dd>
 			<dt class="font-medium">“Agent” followed by its name</dt><dd>Switch to another connected assistant.</dd>
 		</dl>
 	</div>

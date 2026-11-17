@@ -246,6 +246,24 @@ from the README's installation and developer reference.
 Stopping listening keeps Dictare running. **Stop Dictare** is the separate,
 confirmed action that closes the whole engine.
 
+## Personal voice commands
+
+Open **Commands** in settings and turn on **Use my voice commands** to choose
+your own complete phrases for Mute, Resume, and Send, such as “Genni mute,”
+“Genni listen,” and “Dictare send.” Enter one phrase per line, then save.
+Home shows the saved phrases. Other speech is still dictated while listening.
+
+Each action accepts 1–32 phrases of 1–10 words. Matching uses the existing
+Latin-letter/number tokenizer, ignoring case, punctuation, and accents. Choose
+distinct phrases for different actions; conflicting phrases are rejected
+together without changing the file. Empty fields restore the default phrases.
+
+Turning personal commands off restores your existing advanced trigger patterns,
+including language-specific choices. The master voice-control switch still
+applies. Resume works after voice mute; use Home or your shortcut to start
+fully stopped listening. Voice mute currently keeps recognition active to hear
+Resume; it does not turn off microphone capture.
+
 ## Keyboard Mode
 
 No agent? Use dictare as a dictation tool — voice to keystrokes in any app.

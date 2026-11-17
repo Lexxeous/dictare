@@ -1,0 +1,3 @@
+name = "custom-voice-commands"
+bump = "minor"
+summary = "Configure personal mute, resume, and send phrases through ordinary settings fields."

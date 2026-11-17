@@ -71,7 +71,7 @@
 		</svg>
 		<span class="text-sm font-semibold tracking-tight">DICTA<span style="color: #6d5ce6">re</span></span>
 		{#if version}
-			<span class="text-[11px] text-muted-foreground ml-1.5">{version}</span>
+			<span title={version} class="text-[11px] text-muted-foreground ml-1.5 min-w-0 max-w-full break-all text-left">{version}</span>
 		{/if}
 	</button>
 	<button class="sm:hidden rounded-md border px-3 py-2 text-sm" aria-expanded={mobileOpen} aria-controls="settings-pages" onclick={() => mobileOpen = !mobileOpen}>{mobileOpen ? "Close menu" : "Menu"}</button>
