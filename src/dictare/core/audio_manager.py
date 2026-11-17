@@ -762,11 +762,12 @@ class AudioManager:
         """Wait for already queued audio-control work (primarily for tests)."""
         self._control.barrier()
 
-    def set_vad_end_on_silence(self, enabled: bool) -> None:
-        """Change speech segmentation while holding the VAD owner lock."""
+    def set_vad_explicit_turn(self, enabled: bool) -> None:
+        """Atomically change turn segmentation and maximum-duration behavior."""
         with self._vad_lock:
             if self._streaming_vad:
-                self._streaming_vad.end_on_silence = enabled
+                self._streaming_vad.end_on_silence = not enabled
+                self._streaming_vad.discard_on_max = enabled
 
     def flush_vad(self) -> bool:
         """Flush VAD state and report whether buffered speech was emitted."""

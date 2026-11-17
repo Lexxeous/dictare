@@ -232,6 +232,7 @@ class StreamingVAD:
         partial_interval_ms: int = 1000,
         pre_buffer_ms: int = 640,
         end_on_silence: bool = True,
+        discard_on_max: bool = False,
     ) -> None:
         """Initialize streaming VAD.
 
@@ -245,6 +246,7 @@ class StreamingVAD:
             partial_interval_ms: Interval between partial audio callbacks (default 1000ms).
             pre_buffer_ms: Pre-buffer duration in ms to capture audio before speech (default 640ms).
             end_on_silence: Finish a speech segment on silence; explicit flush still works when false.
+            discard_on_max: Discard rather than emit when a turn reaches the maximum duration.
         """
         self.vad = vad
         self.on_speech_start = on_speech_start
@@ -253,6 +255,7 @@ class StreamingVAD:
         self.on_max_speech = on_max_speech
         self.on_partial_audio = on_partial_audio
         self.end_on_silence = end_on_silence
+        self.discard_on_max = discard_on_max
         self._partial_interval_samples = partial_interval_ms * vad.sample_rate // 1000
 
         # State
@@ -329,6 +332,11 @@ class StreamingVAD:
 
             # Check max speech duration (send partial, continue listening)
             if self._total_speech_samples >= self.max_speech_samples:
+                if self.discard_on_max:
+                    self.reset()
+                    if self.on_max_speech:
+                        self.on_max_speech()
+                    return
                 if self._audio_buffer:
                     audio = np.concatenate(self._audio_buffer)
                     self._audio_buffer = []

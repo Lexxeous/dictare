@@ -235,6 +235,23 @@ class TestStreamingVAD:
         assert len(ends) == 1
         assert not sv._is_speaking
 
+    def test_explicit_turn_discards_when_maximum_duration_is_reached(self) -> None:
+        vad = _MockVAD()
+        ends = []
+        limits = []
+        sv = StreamingVAD(vad, on_speech_start=lambda: None, on_speech_end=ends.append,
+                          on_max_speech=lambda: limits.append(True), max_speech_seconds=1,
+                          end_on_silence=False, discard_on_max=True)
+        vad.set_probs([0.8] * 50)
+        for _ in range(50):
+            sv.process_chunk(self._chunk())
+            if limits:
+                break
+        assert limits == [True]
+        assert not ends
+        assert not sv._is_speaking
+        assert not sv._audio_buffer
+
     def test_flush(self) -> None:
         """Flush sends accumulated audio when speaking."""
         vad = _MockVAD()
