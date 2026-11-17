@@ -28,11 +28,11 @@
 				</Button>
 			{/if}
 			<Button
-				disabled={!hasDirty || status === "saving"}
-				onclick={() => settingsStore.saveAll()}
+				disabled={status === "saving"}
+				onclick={() => hasDirty ? settingsStore.saveAll() : settingsStore.retrySavedRestart()}
 				size="sm"
 			>
-				{status === "saving" ? "Saving..." : "Save Changes"}
+				{status === "saving" ? "Saving..." : hasDirty ? "Save Changes" : "Retry Restart"}
 			</Button>
 		</div>
 	</div>

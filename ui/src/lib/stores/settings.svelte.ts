@@ -294,3 +294,16 @@ export async function saveAll(): Promise<void> {
 		saveStatus = "error";
 	}
 }
+
+/** Retry a restart after settings were saved but the engine refused it. */
+export async function retrySavedRestart(): Promise<void> {
+	saveStatus = "saving";
+	try {
+		await restartEngine();
+		saveErrors = {};
+		saveStatus = "saved";
+	} catch (error) {
+		saveErrors = { settings: `Settings were saved, but Dictare did not restart. ${(error as Error).message}` };
+		saveStatus = "error";
+	}
+}
