@@ -12,7 +12,22 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       is_prerelease: ${{ steps.version.outputs.is_prerelease }}
     steps:
+      - name: Require main release branch
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Publish releases from main after integrating a validated develop batch."
+          exit 1
+
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate release intent, source version, and changelog
+        run: python scripts/release_plan.py --main-ref HEAD --branch main --check-release
 
       - name: Get version and detect pre-release
         id: version

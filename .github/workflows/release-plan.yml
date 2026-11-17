@@ -1,0 +1,25 @@
+name: Release intent and version plan
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main, 'feature/**']
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Calculate current release plan
+        env:
+          PLAN_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: python scripts/release_plan.py --main-ref origin/main --branch "$PLAN_BRANCH"
