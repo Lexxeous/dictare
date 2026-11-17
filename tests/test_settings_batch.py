@@ -85,3 +85,40 @@ def test_batch_http_rejects_invalid_shape(path, values):
     original = path.read_bytes()
     assert client.post("/api/settings", json={"values": values}).status_code == 400
     assert path.read_bytes() == original
+
+
+def test_nested_form_fields_preserve_raw_comments_and_other_values(path):
+    path.write_text('[stt.advanced]\nbeam_size = 7 # keep\nhotwords = "cat"\nfuture = "preserve"\n')
+    set_config_values({"stt.advanced.beam_size": "3", "audio.advanced.pre_buffer_ms": "450"}, path)
+    assert load_config(path).stt.advanced.beam_size == 3
+    assert load_config(path).audio.advanced.pre_buffer_ms == 450
+    assert '# keep' in path.read_text()
+    assert 'future = "preserve"' in path.read_text()
+    assert 'hotwords = "cat"' in path.read_text()
+    set_config_values({"stt.advanced.beam_size": None}, path)
+    assert load_config(path).stt.advanced.beam_size == 5
+    assert 'beam_size =' not in path.read_text()
+
+
+def test_invalid_nested_field_leaves_all_edits_unchanged(path):
+    original = path.read_bytes()
+    with pytest.raises(KeyError):
+        set_config_values({"editor": "new", "stt.advanced.unknown": "value"}, path)
+    assert path.read_bytes() == original
+
+
+def test_nested_http_settings_are_saved_together(path):
+    client = TestClient(OpenVIPServer(MockEngine(), MockController(), port=0)._app)
+    response = client.post('/api/settings', json={'values': {'stt.advanced.beam_size': 4, 'audio.advanced.channels': 2}})
+    assert response.status_code == 200
+    assert load_config(path).stt.advanced.beam_size == 4
+    assert load_config(path).audio.advanced.channels == 2
+
+
+def test_invalid_nested_choice_does_not_save_other_fields(path):
+    from pydantic import ValidationError
+
+    original = path.read_bytes()
+    with pytest.raises(ValidationError):
+        set_config_values({"editor": "new", "stt.advanced.device": "imaginary"}, path)
+    assert path.read_bytes() == original

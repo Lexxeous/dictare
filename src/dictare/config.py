@@ -774,6 +774,32 @@ def set_config_values(updates: dict[str, str | None], config_path: Path | None =
     doc = tomlkit.parse(config_path.read_text(encoding="utf-8")) if config_path.exists() else tomlkit.document()
     for key, value in updates.items():
         parts = key.split(".")
+        if len(parts) == 3 and ".".join(parts[:2]) in {"audio.advanced", "stt.advanced"}:
+            section, group, field = parts
+            current_group = config_dict[section][group]
+            default_group = defaults[section][group]
+            if field not in current_group or field not in default_group:
+                raise KeyError(f"Unknown config key: {key}")
+            current = current_group[field]
+            parsed = _parse_value(value, type(current) if current is not None else str) if value is not None else None
+            current_group[field] = default_group[field] if value is None else parsed
+            if value is None:
+                table = doc.get(section, {}).get(group, {})
+                if isinstance(table, dict):
+                    table.pop(field, None)
+            else:
+                if section not in doc:
+                    doc.add(section, tomlkit.table())
+                section_table = doc[section]
+                if not isinstance(section_table, dict):
+                    raise ValueError(f"Config section is not a table: {section}")
+                if group not in section_table:
+                    section_table.add(group, tomlkit.table())
+                table = section_table[group]
+                if not isinstance(table, dict):
+                    raise ValueError(f"Config section is not a table: {section}.{group}")
+                table[field] = parsed
+            continue
         if len(parts) == 1 and parts[0] in config_dict:
             current = config_dict[parts[0]]
         elif len(parts) == 2 and isinstance(config_dict.get(parts[0]), dict) and parts[1] in config_dict[parts[0]]:

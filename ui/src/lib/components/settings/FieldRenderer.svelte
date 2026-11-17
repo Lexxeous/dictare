@@ -6,6 +6,7 @@
 	import SelectField from "./fields/SelectField.svelte";
 	import ComplexField from "./fields/ComplexField.svelte";
 	import TomlField from "./fields/TomlField.svelte";
+	import NestedSettings from "./fields/NestedSettings.svelte";
 	import ShortcutsField from "./fields/ShortcutsField.svelte";
 	import KeyCaptureField from "./fields/KeyCaptureField.svelte";
 	import { resolveFieldSchema, getEnumValues } from "$lib/schema";
@@ -17,9 +18,10 @@
 	interface Props {
 		field: FieldMeta;
 		schema: JsonSchema;
+		nestedForm?: boolean;
 	}
 
-	let { field, schema }: Props = $props();
+	let { field, schema, nestedForm = false }: Props = $props();
 
 	function isComplex(f: FieldMeta): boolean {
 		for (const ck of COMPLEX_KEYS) {
@@ -52,7 +54,7 @@
 
 	const fieldSchema = $derived(resolveFieldSchema(field.key, schema));
 	const enumValues = $derived(getEnumValues(fieldSchema));
-	const complex = $derived(isComplex(field));
+	const complex = $derived(nestedForm ? field.type === "dict" || field.type === "list" : isComplex(field));
 	const isTomlEditable = $derived(TOML_EDITABLE_KEYS.has(field.key));
 	const isHiddenByParentToml = $derived(
 		(() => {
@@ -130,13 +132,15 @@
 	}
 </script>
 
-{#if HIDDEN_FORM_FIELDS.has(field.key) || isHiddenByParentToml}
+{#if HIDDEN_FORM_FIELDS.has(field.key) || (isHiddenByParentToml && !nestedForm)}
 	<!-- hidden: excluded from UI or child of a TOML-editable section -->
 {:else if field.key === "keyboard.shortcuts"}
 	<!-- Structured shortcuts editor -->
 	<div class="px-4">
 		<ShortcutsField />
 	</div>
+{:else if field.key === "audio.advanced" || field.key === "stt.advanced"}
+	<NestedSettings section={field.key} {schema} />
 {:else if isTomlEditable}
 	<!-- Full-width TOML editor — no inline label/control split -->
 	<div class="px-4">
