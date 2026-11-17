@@ -37,6 +37,11 @@ boundaries. Keep those documents aligned with the implementation.
 - Save related ordinary form fields through the validated settings batch API.
   It validates all form values before one comment-preserving file replacement.
   TOML sections, model operations, and shortcuts are separate save steps.
+- Phrase controls reuse the pipeline tokenizer and matching rules. Preserve
+  advanced language patterns when offering normal fields, validate conflicting
+  actions together, and display effective saved defaults rather than the
+  generic schema's intentionally blank unset string fields. Do not expose
+  unrelated configuration values in validation errors.
 - Do not add dependencies for a small local change. For substantial new
   functionality, review existing project code and maintained library options,
   then record any material adoption decision in the appropriate documentation.

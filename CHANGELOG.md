@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Configure personal mute, resume, and send phrases in Commands; show saved
+  phrases on Home and preserve advanced language patterns when turned off.
 - Add a plain-language Home with listening controls, destination and command
   cheat sheets, logo navigation, responsive menu, and bundled Markdown README.
 - Show profile/continuation options in agent help and explain nested service help.
@@ -15,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guidance and explicit handling of unconfirmed shutdown requests.
 
 ### Fixed
+- Clear outdated settings validation errors when correcting or retrying a save,
+  and report batch validation failures without including other config values.
 - Treat a trailing resume as named-agent continuation; resolve and display the
   selected Codex session instead of attempting to execute a resume binary.
 

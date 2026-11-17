@@ -293,6 +293,7 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
             "toml_sections": toml_sections,
             "shortcuts": shortcuts,
             "presets": presets,
+            "voice_commands": config.voice_commands.model_dump(),
         }
 
     @app.get("/api/settings/presets")
@@ -365,7 +366,14 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
                 return {"status": "ok"}
             except KeyError as error:
                 raise HTTPException(status_code=404, detail=str(error)) from error
-            except (ValueError, ValidationError) as error:
+            except ValidationError as error:
+                messages = []
+                for problem in error.errors(include_url=False, include_context=False, include_input=False):
+                    field = " ".join(str(part).replace("_", " ") for part in problem["loc"])
+                    message = problem["msg"].removeprefix("Value error, ")
+                    messages.append(f"{field}: {message}" if field else message)
+                raise HTTPException(status_code=400, detail="; ".join(messages)) from error
+            except ValueError as error:
                 raise HTTPException(status_code=400, detail=str(error)) from error
         key = body.get("key", "")
         value = body.get("value")

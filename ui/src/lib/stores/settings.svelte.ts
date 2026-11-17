@@ -144,7 +144,9 @@ export function getValue(key: string): unknown {
 export function markDirty(key: string, value: unknown): void {
 	dirty = { ...dirty, [key]: value };
 	saveStatus = "idle";
-	const { [key]: _, ...rest } = saveErrors;
+	// A batch validation error can involve several fields. Editing any form
+	// field invalidates that previous result; the next save validates again.
+	const { [key]: _, settings: _batch, ...rest } = saveErrors;
 	saveErrors = rest;
 }
 
@@ -207,6 +209,7 @@ export function updateDeviceLists(status: StatusResponse): void {
 
 export async function saveAll(): Promise<void> {
 	saveStatus = "saving";
+	saveErrors = {};
 	const errors: Record<string, string> = {};
 	let errorCount = 0;
 

@@ -21,6 +21,7 @@ export interface SchemaResponse {
 	toml_sections: Record<string, string>;
 	shortcuts: { keys: string; command: string }[];
 	presets: Record<string, PresetEntry>;
+	voice_commands?: { enabled: boolean; mute: string; listen: string; send: string };
 }
 
 export interface JsonSchema {
