@@ -211,6 +211,12 @@ dictare service logs        # View recent logs
 dictare service uninstall   # Remove the service
 ```
 
+The local settings page has a **Stop Dictare** control. It asks for confirmation
+and requests a clean engine shutdown, distinct from stopping listening. The
+page reports when the engine disconnects and explains how to start it again
+from the tray or usual launcher. Launch-at-login preferences are unchanged.
+A lost request connection is reported as unconfirmed rather than as success.
+
 ## Keyboard Mode
 
 No agent? Use dictare as a dictation tool — voice to keystrokes in any app.
@@ -308,3 +314,15 @@ are preserved in `~/.config/dictare/` and `~/.local/share/dictare/`.
 ## License
 
 MIT
+
+### Settings UI checks
+
+From `ui/`, run `npm test` for shutdown confirmation and protocol checks
+(requires Node 22.18 or newer for TypeScript stripping),
+`npx --no-install svelte-check --tsconfig ./tsconfig.json`, and `npm run build`.
+The production build updates the packaged UI in `src/dictare/ui/dist/`.
+For a source backend on another port, set `DICTARE_API_TARGET` to its origin
+when starting Vite; `/api` and `/openvip` requests are proxied to that engine.
+When reusing dependencies across Git worktrees, explicitly set
+`DICTARE_DEV_DEPENDENCIES` to the shared `ui/node_modules` directory in an
+ignored `ui/.env.local`. Vite keeps its file-serving boundary enabled.

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add a confirmed whole-engine stop control to settings, with stopped-state
+  guidance and explicit handling of unconfirmed shutdown requests.
+
 ### Development
 - Define one immediate feature branch per local request, complexity-ordered
   implementation, validated checkpoint commits, and build/runner review.

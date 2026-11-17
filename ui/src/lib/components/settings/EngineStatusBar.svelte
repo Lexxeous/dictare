@@ -4,7 +4,7 @@
 	import * as settingsStore from "$lib/stores/settings.svelte";
 	import { setEngineBarVisible } from "$lib/stores/settings.svelte";
 
-	type BarState = "hidden" | "restarting" | "loading" | "disconnected" | "ready";
+	type BarState = "hidden" | "restarting" | "loading" | "disconnected" | "ready" | "stopping" | "stopped";
 
 	let barState = $state<BarState>("hidden");
 	let sawDown = false;
@@ -39,6 +39,23 @@
 
 	async function poll() {
 		const status = await checkEngine();
+		if (settingsStore.getEngineShutdownRequested()) {
+			if (hideTimer) {
+				clearTimeout(hideTimer);
+				hideTimer = null;
+			}
+			if (status === "down") {
+				barState = "stopped";
+				return;
+			}
+			if (barState !== "stopped") {
+				barState = "stopping";
+				return;
+			}
+			// An engine that returns after stopping was started outside this page.
+			settingsStore.setEngineShutdownRequested(false);
+			settingsStore.load();
+		}
 
 		if (status === "down") {
 			consecutiveDownCount++;
@@ -107,7 +124,13 @@
 						: 'rgb(29 20 66 / 0.9)'};"
 	>
 		<div class="max-w-2xl mx-auto flex items-center justify-center gap-2 py-2.5 px-6">
-			{#if barState === "restarting"}
+			{#if barState === "stopped"}
+				<CheckCircle class="size-3.5 shrink-0" />
+				<span role="status" class="text-sm">Dictare stopped. Start it from the tray or your usual launcher, then reload this page.</span>
+			{:else if barState === "stopping"}
+				<Loader class="size-3.5 animate-spin" />
+				<span role="status" class="text-sm">Stop requested. Waiting for Dictare to disconnect…</span>
+			{:else if barState === "restarting"}
 				<Loader class="size-3.5 animate-spin text-orange-400" />
 				<span class="text-sm text-orange-300">Engine restarting...</span>
 			{:else if barState === "loading"}

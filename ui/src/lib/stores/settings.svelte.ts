@@ -9,6 +9,15 @@ let dirtyShortcuts = $state<Shortcut[] | null>(null);
 let saveStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
 let saveErrors = $state<Record<string, string>>({});
 let engineBarVisible = $state(false);
+let engineShutdownRequested = $state(false);
+
+export function getEngineShutdownRequested(): boolean {
+	return engineShutdownRequested;
+}
+
+export function setEngineShutdownRequested(value: boolean): void {
+	engineShutdownRequested = value;
+}
 let audioInUse = $state<{ input: string | null; output: string | null }>({
 	input: null,
 	output: null,

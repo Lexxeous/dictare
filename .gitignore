@@ -70,7 +70,7 @@ test_sanitization.py
 /sounds/
 
 # Settings UI (SvelteKit build tooling)
-ui/node_modules/
+ui/node_modules
 ui/.svelte-kit/
 # Override generic dist/ and lib/ patterns for UI files
 !ui/src/lib/
