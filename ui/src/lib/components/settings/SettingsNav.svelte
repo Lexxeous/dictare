@@ -15,6 +15,7 @@
 
 	/** Set of expanded parent IDs (expandable tabs whose children are visible). */
 	let expanded = $state<Set<string>>(new Set());
+	let mobileOpen = $state(false);
 
 	/** When activeNavId changes, ensure the parent tab is expanded. */
 	$effect(() => {
@@ -56,8 +57,9 @@
 	}
 </script>
 
-<nav class="w-52 shrink-0 border-r bg-background/50 h-screen overflow-y-auto p-3 flex flex-col">
-	<div class="px-3 pt-8 pb-3 mb-1 flex items-center gap-2">
+<nav aria-label="Settings navigation" class="w-full sm:w-52 shrink-0 border-b sm:border-b-0 sm:border-r bg-background/50 sm:h-screen max-h-[50vh] sm:max-h-none overflow-y-auto p-3 flex flex-col">
+	<div class="flex items-center justify-between gap-2">
+	<button aria-label="Dictare Home" onclick={() => { activeNavId = "home"; mobileOpen = false; }} class="min-w-0 px-3 py-3 sm:pt-8 sm:pb-3 mb-1 flex flex-wrap items-center gap-2 rounded-md focus-visible:ring-2 focus-visible:ring-ring">
 		<svg width="24" height="24" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
 			<rect x="0" y="0" width="100" height="100" rx="22" fill="#6d5ce6"/>
 			<g transform="translate(0, 4)">
@@ -71,7 +73,10 @@
 		{#if version}
 			<span class="text-[11px] text-muted-foreground ml-1.5">{version}</span>
 		{/if}
+	</button>
+	<button class="sm:hidden rounded-md border px-3 py-2 text-sm" aria-expanded={mobileOpen} aria-controls="settings-pages" onclick={() => mobileOpen = !mobileOpen}>{mobileOpen ? "Close menu" : "Menu"}</button>
 	</div>
+	<div id="settings-pages" class="{mobileOpen ? 'flex' : 'hidden'} sm:flex flex-col flex-1">
 	<Separator class="mb-3" />
 
 	<div class="space-y-0.5">
@@ -102,7 +107,8 @@
 									{isActive(child.id)
 										? 'bg-accent text-accent-foreground font-medium'
 										: 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground'}"
-								onclick={() => selectLeaf(child.id)}
+					onclick={() => { selectLeaf(child.id); mobileOpen = false; }}
+					aria-current={isActive(child.id) ? "page" : undefined}
 							>
 								{child.label}
 							</button>
@@ -116,7 +122,8 @@
 						{isActive(tab.id)
 							? 'bg-accent text-accent-foreground font-medium'
 							: 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground'}"
-					onclick={() => selectLeaf(tab.id)}
+					onclick={() => { selectLeaf(tab.id); mobileOpen = false; }}
+					aria-current={isActive(tab.id) ? "page" : undefined}
 				>
 					<Icon class="size-4 shrink-0" />
 					{tab.label}
@@ -139,5 +146,6 @@
 				</button>
 			{/each}
 		</div>
+	</div>
 	</div>
 </nav>

@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add a plain-language Home with listening controls, destination and command
+  cheat sheets, logo navigation, responsive menu, and bundled Markdown README.
 - Show profile/continuation options in agent help and explain nested service help.
 - Add a confirmed whole-engine stop control to settings, with stopped-state
   guidance and explicit handling of unconfirmed shutdown requests.

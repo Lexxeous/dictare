@@ -8,10 +8,14 @@ import {
   Settings,
   SlidersHorizontal,
   Volume2,
+  House,
+  BookOpen,
 } from "lucide-svelte";
 import type { TabDef } from "$lib/types";
 
 export const tabs: TabDef[] = [
+  { id: "home", label: "Home", icon: House, sections: [], desc: "Speak, write, and send with Dictare" },
+  { id: "documentation", label: "Documentation", icon: BookOpen, sections: [], desc: "The complete guide included with Dictare" },
   {
     id: "dashboard",
     label: "Dashboard",
