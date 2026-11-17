@@ -18,3 +18,11 @@ test("batch errors retain the backend validation message", async (t) => {
 	t.mock.method(globalThis, "fetch", async () => Response.json({ detail: "conflicting commands" }, { status: 400 }));
 	await assert.rejects(() => saveSettings({ editor: "new" }), /conflicting commands/);
 });
+
+test("profile names and argument lists are sent as structured data", async (t) => {
+	t.mock.method(globalThis, "fetch", async (_url, init) => {
+		assert.deepEqual(JSON.parse(init.body), { values: {}, profiles: { "my.profile": { command: ["agent", "--resume"] } } });
+		return Response.json({ status: "ok" });
+	});
+	await saveSettings({}, { "my.profile": { command: ["agent", "--resume"] } });
+});

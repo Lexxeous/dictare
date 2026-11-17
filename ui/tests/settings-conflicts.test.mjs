@@ -20,3 +20,8 @@ test("detects replacement of a whole section or its parent", () => {
   assert.deepEqual(conflictingSections({ audio: {} }, { "audio.advanced": "text" }), ["audio.advanced"]);
   assert.deepEqual(conflictingSections({ "audio.advanced": {} }, { "audio.advanced": "text" }), ["audio.advanced"]);
 });
+
+test("profile edits conflict with the raw assistant profiles section", () => {
+  assert.deepEqual(conflictingSections({}, { agent_profiles: "text" }, { "my.profile": { description: "x" } }), ["agent_profiles"]);
+  assert.deepEqual(conflictingSections({}, { "audio.advanced": "text" }, { codex: {} }), []);
+});

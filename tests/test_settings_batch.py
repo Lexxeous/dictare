@@ -198,3 +198,38 @@ def test_arbitrary_or_invalid_list_values_are_rejected_atomically(path):
     for values in ({'editor': ['bad']}, {'pipeline.agent_filter.triggers': [3]}, {'pipeline.mute_filter.mute_triggers': ['bad']}):
         assert client.post('/api/settings', json={'values': values}).status_code in (400, 404)
         assert path.read_bytes() == original
+
+
+def test_profile_form_updates_exact_name_and_preserves_unknown_values(path):
+    path.write_text('[agent_profiles."my.profile"]\ncommand = ["agent"] # keep\nextra = "preserve"\n')
+    client = TestClient(OpenVIPServer(MockEngine(), MockController(), port=0)._app)
+    response = client.post('/api/settings', json={'values': {'editor': 'new'}, 'profiles': {'my.profile': {'command': ['agent', '--resume'], 'description': 'My agent'}}})
+    assert response.status_code == 200
+    assert load_config(path).agent_profiles.get('my.profile').command == ['agent', '--resume']
+    assert load_config(path).editor == 'new'
+    assert '# keep' in path.read_text() and 'extra = "preserve"' in path.read_text()
+
+
+def test_invalid_profile_update_rejects_whole_batch(path):
+    path.write_text('[agent_profiles.codex]\ncommand = ["codex"]\n')
+    original = path.read_bytes()
+    client = TestClient(OpenVIPServer(MockEngine(), MockController(), port=0)._app)
+    for changes in ({'codex': {'command': [3]}}, {'missing': {'description': 'x'}}, {'codex': {'future': 'x'}}):
+        response = client.post('/api/settings', json={'values': {'editor': 'new'}, 'profiles': changes})
+        assert response.status_code in (400, 404)
+        assert path.read_bytes() == original
+
+
+def test_profile_permission_override_can_be_inherited(path):
+    path.write_text('[agent_profiles.codex]\ncommand = ["codex"]\nlive_dangerously = true\n')
+    set_config_values({}, path, profile_updates={'codex': {'live_dangerously': None}})
+    assert load_config(path).agent_profiles.get('codex').live_dangerously is None
+    assert 'live_dangerously' not in path.read_text()
+
+
+def test_empty_profile_command_is_rejected(path):
+    path.write_text('[agent_profiles.codex]\ncommand = ["codex"]\n')
+    original = path.read_bytes()
+    with pytest.raises(ValueError):
+        set_config_values({}, path, profile_updates={'codex': {'command': []}})
+    assert path.read_bytes() == original

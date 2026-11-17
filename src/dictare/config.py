@@ -755,7 +755,12 @@ def _stamp_version(doc: Any) -> None:
 
     doc["_version"] = f"dictare/{__version__}"
 
-def set_config_values(updates: dict[str, str | list[str] | None], config_path: Path | None = None) -> None:
+def set_config_values(
+    updates: dict[str, str | list[str] | None],
+    config_path: Path | None = None,
+    *,
+    profile_updates: dict[str, dict[str, Any]] | None = None,
+) -> None:
     """Validate form changes together, then replace one comment-preserving TOML file.
 
     None removes a key and restores its schema default. This transaction covers
@@ -766,7 +771,7 @@ def set_config_values(updates: dict[str, str | list[str] | None], config_path: P
 
     import tomlkit
 
-    if not updates:
+    if not updates and not profile_updates:
         return
     config_path = (config_path or get_config_path()).resolve()
     config_dict = load_config(config_path).model_dump()
@@ -850,8 +855,39 @@ def set_config_values(updates: dict[str, str | list[str] | None], config_path: P
                 if not isinstance(table, dict):
                     raise ValueError(f"Config section is not a table: {section}")
                 table[field] = parsed
+    if profile_updates:
+        profiles = config_dict["agent_profiles"]
+        profile_tables = doc.get("agent_profiles")
+        if not isinstance(profile_tables, dict):
+            raise ValueError("No agent profiles are configured")
+        allowed_fields = {"command", "description", "continue_args", "live_dangerously_args", "live_dangerously"}
+        for name, changes in profile_updates.items():
+            if name in {"default", "live_dangerously"} or not isinstance(profiles.get(name), dict):
+                raise KeyError(f"Unknown agent profile: {name}")
+            table = profile_tables.get(name)
+            if not isinstance(table, dict) or not changes or not set(changes).issubset(allowed_fields):
+                raise ValueError(f"Invalid agent profile fields: {name}")
+            profile = profiles[name]
+            for field, value in changes.items():
+                if field in {"command", "continue_args", "live_dangerously_args"}:
+                    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+                        raise ValueError(f"Expected a list of strings: {name}.{field}")
+                    if field == "command" and (not value or not value[0].strip()):
+                        raise ValueError(f"An executable is required: {name}")
+                elif field == "description":
+                    if not isinstance(value, str):
+                        raise ValueError(f"Expected text: {name}.{field}")
+                elif not isinstance(value, bool) and value is not None:
+                    raise ValueError(f"Expected true, false or inherited: {name}.{field}")
+                if value is None:
+                    profile.pop(field, None)
+                    table.pop(field, None)
+                else:
+                    profile[field] = value
+                    table[field] = value
+            AgentProfileConfig.model_validate(profile)
     Config.model_validate(config_dict)
-    if not config_path.exists() and all(value is None for value in updates.values()):
+    if not profile_updates and not config_path.exists() and all(value is None for value in updates.values()):
         return
     _stamp_version(doc)
     config_path.parent.mkdir(parents=True, exist_ok=True)

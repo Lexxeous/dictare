@@ -38,11 +38,13 @@ export async function saveSetting(
 	return r.json();
 }
 
-export async function saveSettings(values: Record<string, unknown>): Promise<void> {
+export type ProfileChanges = Record<string, Record<string, string | string[] | boolean | null>>;
+
+export async function saveSettings(values: Record<string, unknown>, profiles?: ProfileChanges): Promise<void> {
 	const response = await fetch(`${API}/settings`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ values })
+		body: JSON.stringify(profiles && Object.keys(profiles).length ? { values, profiles } : { values })
 	});
 	if (!response.ok) {
 		const data = await response.json();

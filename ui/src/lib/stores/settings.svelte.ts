@@ -1,10 +1,11 @@
 import { conflictingSections } from "$lib/settings-conflicts";
-import { fetchSchema, saveSettings, saveTomlSection, saveShortcuts, selectCapability, restartEngine, type Shortcut, type StatusResponse } from "$lib/api";
+import { fetchSchema, saveSettings, saveTomlSection, saveShortcuts, selectCapability, restartEngine, type Shortcut, type StatusResponse, type ProfileChanges } from "$lib/api";
 import type { SchemaResponse } from "$lib/types";
 
 let schema = $state<SchemaResponse | null>(null);
 let dirty = $state<Record<string, unknown>>({});
 let dirtyToml = $state<Record<string, string>>({});
+let dirtyProfiles = $state<ProfileChanges>({});
 let dirtyModels = $state<Record<string, string>>({});
 let dirtyShortcuts = $state<Shortcut[] | null>(null);
 let saveStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
@@ -29,6 +30,13 @@ export function getSchema(): SchemaResponse | null {
 }
 export function getDirty(): Record<string, unknown> {
 	return dirty;
+}
+export function getDirtyProfiles(): ProfileChanges {
+	return dirtyProfiles;
+}
+export function markProfileDirty(name: string, field: string, value: string | string[] | boolean | null): void {
+	dirtyProfiles = { ...dirtyProfiles, [name]: { ...dirtyProfiles[name], [field]: value } };
+	saveStatus = "idle";
 }
 export function getDirtyToml(): Record<string, string> {
 	return dirtyToml;
@@ -63,6 +71,7 @@ export function hasDirtyFields(): boolean {
 	return (
 		Object.keys(dirty).length > 0 ||
 		Object.keys(dirtyToml).length > 0 ||
+		Object.keys(dirtyProfiles).length > 0 ||
 		Object.keys(dirtyModels).length > 0 ||
 		dirtyShortcuts !== null
 	);
@@ -120,6 +129,7 @@ export function getPresetValues(key: string): { value: string; label: string }[]
 export function resetDirty(): void {
 	dirty = {};
 	dirtyToml = {};
+	dirtyProfiles = {};
 	dirtyModels = {};
 	dirtyShortcuts = null;
 	saveErrors = {};
@@ -211,7 +221,7 @@ export function updateDeviceLists(status: StatusResponse): void {
 export async function saveAll(): Promise<void> {
 	// A raw fragment replaces its section after form values are saved. Refuse
 	// overlapping edits before any writes so neither version silently wins.
-	const conflicts = conflictingSections(dirty, dirtyToml);
+	const conflicts = conflictingSections(dirty, dirtyToml, dirtyProfiles);
 	if (conflicts.length) {
 		saveErrors = { settings: `Both form and advanced text changed for ${conflicts.join(", ")}. Cancel the changes, then save one editing mode at a time.` };
 		saveStatus = "error";
@@ -223,9 +233,9 @@ export async function saveAll(): Promise<void> {
 	let errorCount = 0;
 
 	// Save form fields
-	if (Object.keys(dirty).length) {
+	if (Object.keys(dirty).length || Object.keys(dirtyProfiles).length) {
 		try {
-			await saveSettings(dirty);
+			await saveSettings(dirty, dirtyProfiles);
 		} catch (e) {
 			errors.settings = (e as Error).message;
 			errorCount++;
@@ -276,6 +286,16 @@ export async function saveAll(): Promise<void> {
 				}
 				obj[parts[parts.length - 1]] = value;
 			}
+			const profiles = schema.values.agent_profiles as Record<string, Record<string, unknown>> | undefined;
+			if (profiles) {
+				for (const [name, changes] of Object.entries(dirtyProfiles)) {
+					if (!profiles[name]) continue;
+					for (const [field, value] of Object.entries(changes)) {
+						if (value === null) delete profiles[name][field];
+						else profiles[name][field] = value;
+					}
+				}
+			}
 			for (const [section, content] of Object.entries(dirtyToml)) {
 				schema.toml_sections[section] = content;
 			}
@@ -287,6 +307,7 @@ export async function saveAll(): Promise<void> {
 		}
 		dirty = {};
 		dirtyToml = {};
+		dirtyProfiles = {};
 		dirtyModels = {};
 		dirtyShortcuts = null;
 		saveStatus = "saved";
