@@ -761,6 +761,7 @@ def set_config_values(
     *,
     profile_updates: dict[str, dict[str, Any]] | None = None,
     create_profiles: list[str] | None = None,
+    delete_profiles: list[str] | None = None,
 ) -> None:
     """Validate form changes together, then replace one comment-preserving TOML file.
 
@@ -772,7 +773,7 @@ def set_config_values(
 
     import tomlkit
 
-    if not updates and not profile_updates and not create_profiles:
+    if not updates and not profile_updates and not create_profiles and not delete_profiles:
         return
     config_path = (config_path or get_config_path()).resolve()
     config_dict = load_config(config_path).model_dump()
@@ -929,8 +930,22 @@ def set_config_values(
                     profile[field] = value
                     table[field] = value
             AgentProfileConfig.model_validate(profile)
+    if delete_profiles:
+        if len(set(delete_profiles)) != len(delete_profiles) or set(delete_profiles) & set(create_profiles or []):
+            raise ValueError("Conflicting agent profile changes")
+        profiles = config_dict["agent_profiles"]
+        profile_tables = doc.get("agent_profiles")
+        if not isinstance(profile_tables, dict):
+            raise ValueError("No agent profiles are configured")
+        for name in delete_profiles:
+            if name in {"default", "live_dangerously"} or not isinstance(profiles.get(name), dict) or name not in profile_tables:
+                raise KeyError(f"Unknown agent profile: {name}")
+            if profiles.get("default") == name:
+                raise ValueError(f"Choose another default before removing profile: {name}")
+            del profiles[name]
+            del profile_tables[name]
     Config.model_validate(config_dict)
-    if not profile_updates and not create_profiles and not config_path.exists() and all(value is None for value in updates.values()):
+    if not profile_updates and not create_profiles and not delete_profiles and not config_path.exists() and all(value is None for value in updates.values()):
         return
     _stamp_version(doc)
     config_path.parent.mkdir(parents=True, exist_ok=True)

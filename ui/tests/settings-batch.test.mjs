@@ -34,3 +34,11 @@ test("new profile creation uses an explicit name and structured command", async 
 	});
 	await saveSettings({}, { "my.agent": { command: ["agent"] } }, ["my.agent"]);
 });
+
+test("profile removal and changing default use one settings request", async (t) => {
+	t.mock.method(globalThis, "fetch", async (_url, init) => {
+		assert.deepEqual(JSON.parse(init.body), { values: { "agent_profiles.default": "other" }, delete_profiles: ["old.agent"] });
+		return Response.json({ status: "ok" });
+	});
+	await saveSettings({ "agent_profiles.default": "other" }, {}, [], ["old.agent"]);
+});

@@ -360,6 +360,9 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
             values = body.get("values", {})
             profiles = body.get("profiles", {})
             creations = body.get("create_profiles", [])
+            deletions = body.get("delete_profiles", [])
+            if not isinstance(deletions, list) or any(not isinstance(name, str) for name in deletions):
+                raise HTTPException(status_code=400, detail="Expected a list of profiles to remove")
             if not isinstance(creations, list) or any(not isinstance(name, str) for name in creations):
                 raise HTTPException(status_code=400, detail="Expected a list of new profile names")
             if not isinstance(profiles, dict) or any(
@@ -367,7 +370,7 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
                 for name, changes in profiles.items()
             ):
                 raise HTTPException(status_code=400, detail="Expected profile changes by name")
-            if not isinstance(values, dict) or (not values and not profiles and not creations) or any(
+            if not isinstance(values, dict) or (not values and not profiles and not creations and not deletions) or any(
                 not isinstance(key, str)
                 or value is None
                 or not (isinstance(value, (str, bool, int, float)) or
@@ -381,6 +384,7 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
                     {key: None if value == "" else value if isinstance(value, (list, dict)) else str(value) for key, value in values.items()},
                     profile_updates=profiles,
                     create_profiles=creations,
+                    delete_profiles=deletions,
                 )
                 logger.info("settings.change keys=%s", sorted(values))
                 return {"status": "ok"}

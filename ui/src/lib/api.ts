@@ -40,11 +40,11 @@ export async function saveSetting(
 
 export type ProfileChanges = Record<string, Record<string, string | string[] | boolean | null>>;
 
-export async function saveSettings(values: Record<string, unknown>, profiles?: ProfileChanges, createProfiles: string[] = []): Promise<void> {
+export async function saveSettings(values: Record<string, unknown>, profiles?: ProfileChanges, createProfiles: string[] = [], deleteProfiles: string[] = []): Promise<void> {
 	const response = await fetch(`${API}/settings`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(createProfiles.length ? { values, profiles, create_profiles: createProfiles } : profiles && Object.keys(profiles).length ? { values, profiles } : { values })
+		body: JSON.stringify({ values, ...(profiles && Object.keys(profiles).length ? { profiles } : {}), ...(createProfiles.length ? { create_profiles: createProfiles } : {}), ...(deleteProfiles.length ? { delete_profiles: deleteProfiles } : {}) })
 	});
 	if (!response.ok) {
 		const data = await response.json();

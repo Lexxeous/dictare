@@ -8,7 +8,7 @@
 	const profiles = $derived((settingsStore.getValue("agent_profiles") ?? {}) as Record<string, unknown>);
 	const options = $derived([
 		...Object.entries(profiles)
-			.filter(([, value]) => value !== null && typeof value === "object" && !Array.isArray(value))
+			.filter(([name, value]) => !settingsStore.getDeletedProfiles().includes(name) && value !== null && typeof value === "object" && !Array.isArray(value))
 			.map(([name]) => ({ value: name, label: name })),
 		...settingsStore.getCreatedProfiles().map((name) => ({ value: name, label: name })),
 	]);
@@ -20,7 +20,7 @@
 			nameError = "Use letters, numbers, dots, hyphens or underscores for a new profile name.";
 			return;
 		}
-		if (options.some((option) => option.value === name)) {
+		if (options.some((option) => option.value === name) || settingsStore.getDeletedProfiles().includes(name)) {
 			nameError = "A profile with this name already exists.";
 			return;
 		}
@@ -34,6 +34,16 @@
 		["command", "Command and arguments"], ["continue_args", "Resume arguments"],
 		["live_dangerously_args", "Permission-bypass arguments"],
 	];
+	function removeExisting(name: string): void {
+		if (selected === name) {
+			nameError = "Choose a different default assistant before removing this profile.";
+			return;
+		}
+		if (window.confirm(`Remove the assistant profile “${name}” when you save?`)) {
+			settingsStore.removeProfile(name);
+			nameError = "";
+		}
+	}
 	function profileValue(name: string, field: string): unknown {
 		const dirty = settingsStore.getDirtyProfiles()[name];
 		if (dirty && field in dirty) return dirty[field];
@@ -69,6 +79,8 @@
 					{#if settingsStore.getCreatedProfiles().includes(option.value)}
 						<p class="text-xs text-muted-foreground">Enter an executable as the first line of the command before saving.</p>
 						<Button variant="ghost" size="sm" onclick={() => settingsStore.discardNewProfile(option.value)}>Remove new profile</Button>
+					{:else}
+						<Button variant="ghost" size="sm" onclick={() => removeExisting(option.value)}>Remove profile</Button>
 					{/if}
 					<label class="block text-sm">Description
 						<input class="mt-1 w-full rounded-md border bg-background px-3 py-2" type="text"
@@ -92,6 +104,12 @@
 					</div>
 				</div>
 			</details>
+		{/each}
+		{#each settingsStore.getDeletedProfiles() as removed (removed)}
+			<div class="flex items-center justify-between gap-2 text-sm mb-2">
+				<span>{removed} will be removed on save.</span>
+				<Button variant="outline" size="sm" onclick={() => settingsStore.restoreProfile(removed)}>Undo</Button>
+			</div>
 		{/each}
 		<div class="flex flex-wrap gap-2 mb-3">
 			<input class="w-48 rounded-md border bg-background px-3 py-2 text-sm" aria-label="New profile name" placeholder="New profile name" bind:value={newName} />

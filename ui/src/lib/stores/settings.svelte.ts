@@ -7,6 +7,7 @@ let dirty = $state<Record<string, unknown>>({});
 let dirtyToml = $state<Record<string, string>>({});
 let dirtyProfiles = $state<ProfileChanges>({});
 let createdProfiles = $state<string[]>([]);
+let deletedProfiles = $state<string[]>([]);
 let dirtyModels = $state<Record<string, string>>({});
 let dirtyShortcuts = $state<Shortcut[] | null>(null);
 let saveStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
@@ -33,6 +34,15 @@ export function getDirty(): Record<string, unknown> {
 	return dirty;
 }
 export function getCreatedProfiles(): string[] { return createdProfiles; }
+export function getDeletedProfiles(): string[] { return deletedProfiles; }
+export function removeProfile(name: string): void {
+	deletedProfiles = [...deletedProfiles, name];
+	saveStatus = "idle";
+}
+export function restoreProfile(name: string): void {
+	deletedProfiles = deletedProfiles.filter((profile) => profile !== name);
+	saveStatus = "idle";
+}
 export function createProfile(name: string): void {
 	createdProfiles = [...createdProfiles, name];
 	markProfileDirty(name, "command", []);
@@ -87,6 +97,7 @@ export function hasDirtyFields(): boolean {
 		Object.keys(dirty).length > 0 ||
 		Object.keys(dirtyToml).length > 0 ||
 		Object.keys(dirtyProfiles).length > 0 ||
+		deletedProfiles.length > 0 ||
 		Object.keys(dirtyModels).length > 0 ||
 		dirtyShortcuts !== null
 	);
@@ -146,6 +157,7 @@ export function resetDirty(): void {
 	dirtyToml = {};
 	dirtyProfiles = {};
 	createdProfiles = [];
+	deletedProfiles = [];
 	dirtyModels = {};
 	dirtyShortcuts = null;
 	saveErrors = {};
@@ -238,6 +250,7 @@ export async function saveAll(): Promise<void> {
 	// A raw fragment replaces its section after form values are saved. Refuse
 	// overlapping edits before any writes so neither version silently wins.
 	const conflicts = conflictingSections(dirty, dirtyToml, dirtyProfiles);
+	if (deletedProfiles.length && "agent_profiles" in dirtyToml && !conflicts.includes("agent_profiles")) conflicts.push("agent_profiles");
 	if (conflicts.length) {
 		saveErrors = { settings: `Both form and advanced text changed for ${conflicts.join(", ")}. Cancel the changes, then save one editing mode at a time.` };
 		saveStatus = "error";
@@ -249,9 +262,9 @@ export async function saveAll(): Promise<void> {
 	let errorCount = 0;
 
 	// Save form fields
-	if (Object.keys(dirty).length || Object.keys(dirtyProfiles).length) {
+	if (Object.keys(dirty).length || Object.keys(dirtyProfiles).length || deletedProfiles.length) {
 		try {
-			await saveSettings(dirty, dirtyProfiles, createdProfiles);
+			await saveSettings(dirty, dirtyProfiles, createdProfiles, deletedProfiles);
 		} catch (e) {
 			errors.settings = (e as Error).message;
 			errorCount++;
@@ -304,6 +317,7 @@ export async function saveAll(): Promise<void> {
 			}
 			const profiles = schema.values.agent_profiles as Record<string, Record<string, unknown>> | undefined;
 			if (profiles) {
+				for (const name of deletedProfiles) delete profiles[name];
 				for (const [name, changes] of Object.entries(dirtyProfiles)) {
 					if (createdProfiles.includes(name)) profiles[name] = {};
 					if (!Object.hasOwn(profiles, name)) continue;
@@ -326,6 +340,7 @@ export async function saveAll(): Promise<void> {
 		dirtyToml = {};
 		dirtyProfiles = {};
 		createdProfiles = [];
+		deletedProfiles = [];
 		dirtyModels = {};
 		dirtyShortcuts = null;
 		saveStatus = "saved";

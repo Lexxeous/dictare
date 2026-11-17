@@ -279,3 +279,25 @@ def test_profile_creation_rejects_invalid_duplicate_or_incomplete_without_writes
         response = client.post('/api/settings', json={'values': {'editor': 'new'}, 'create_profiles': [name], 'profiles': {name: profile}})
         assert response.status_code == 400
         assert path.read_bytes() == original
+
+
+def test_remove_profile_with_new_default_is_atomic_and_preserves_others(path):
+    path.write_text('[agent_profiles]\ndefault = "old"\n[agent_profiles.old]\ncommand = ["old"]\n[agent_profiles."new.agent"]\ncommand = ["new"] # keep\n')
+    client = TestClient(OpenVIPServer(MockEngine(), MockController(), port=0)._app)
+    response = client.post('/api/settings', json={'values': {'agent_profiles.default': 'new.agent'}, 'delete_profiles': ['old']})
+    assert response.status_code == 200
+    config = load_config(path)
+    assert config.agent_profiles.default == 'new.agent'
+    assert config.agent_profiles.get('old') is None
+    assert config.agent_profiles.get('new.agent').command == ['new']
+    assert '# keep' in path.read_text()
+
+
+def test_removing_current_default_or_unknown_profile_rejects_whole_batch(path):
+    path.write_text('[agent_profiles]\ndefault = "codex"\n[agent_profiles.codex]\ncommand = ["codex"]\n')
+    original = path.read_bytes()
+    client = TestClient(OpenVIPServer(MockEngine(), MockController(), port=0)._app)
+    for name in ('codex', 'missing', 'default'):
+        response = client.post('/api/settings', json={'values': {'editor': 'new'}, 'delete_profiles': [name]})
+        assert response.status_code in (400, 404)
+        assert path.read_bytes() == original
