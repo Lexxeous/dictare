@@ -77,3 +77,14 @@ def test_stop_waits_until_port_is_released(monkeypatch):
     monkeypatch.setattr(module, "port_in_use", lambda url: next(states))
     monkeypatch.setattr(module.time, "sleep", lambda seconds: None)
     assert module.wait_for_port_close("http://127.0.0.1:18770")
+
+
+def test_older_engine_without_identity_has_clear_recovery(monkeypatch):
+    from urllib.error import HTTPError
+
+    open_url = MagicMock(side_effect=HTTPError("http://127.0.0.1:18770/api/dev/identity", 404, "missing", {}, None))
+    monkeypatch.setattr(module, "urlopen", open_url)
+    monkeypatch.setenv("DICTARE_DEV_CHECKOUT", "/source")
+    with pytest.raises(ValueError, match="stop it from its original terminal"):
+        module.send_source_command("http://127.0.0.1:18770", "engine.shutdown")
+    assert open_url.call_count == 1

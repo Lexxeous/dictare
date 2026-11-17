@@ -7,7 +7,7 @@ import os
 import socket
 import sys
 import time
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
@@ -29,8 +29,15 @@ def send_source_command(base_url: str, command: str) -> dict:
     parsed = urlsplit(base_url)
     if parsed.scheme != "http" or parsed.hostname != "127.0.0.1" or parsed.port is None:
         raise ValueError("Expected a loopback development URL with a port")
-    with urlopen(base_url + "/api/dev/identity", timeout=5) as response:
-        identity = json.load(response)
+    try:
+        with urlopen(base_url + "/api/dev/identity", timeout=5) as response:
+            identity = json.load(response)
+    except HTTPError as exc:
+        if exc.code == 404:
+            raise ValueError(
+                "The running engine does not support source identity; stop it from its original terminal."
+            ) from exc
+        raise
     checkout = os.environ.get("DICTARE_DEV_CHECKOUT")
     if not checkout or not isinstance(identity, dict) or identity.get("source") is not True or identity.get("checkout") != checkout:
         raise ValueError("The engine did not identify itself as this checkout’s source instance")
