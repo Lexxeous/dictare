@@ -97,7 +97,9 @@ _preload_sounds()
 # Audio playback queue — serializes all sounddevice output on one thread
 # ---------------------------------------------------------------------------
 
-_play_queue: queue.Queue[tuple[str, float, Callable[[], None] | None] | None] = queue.Queue()
+_play_queue: queue.Queue[tuple[str, float, Callable[[], None] | None, int, Callable[[], None] | None] | None] = queue.Queue()
+_play_generation = 0
+_play_generation_lock = threading.RLock()
 _worker_started = False
 _worker_lock = threading.Lock()
 _audio_control_execute: Callable[[str, Callable[[], Any]], Any] | None = None
@@ -130,6 +132,40 @@ def stop_portaudio_output() -> None:
         lambda: _run_with_timeout(sd.stop, timeout_s=3.0, label="output_stop"),
     )
 
+def _enqueue_sound(
+    path: str, volume: float, on_complete: Callable[[], None] | None,
+    on_cancel: Callable[[], None] | None = None,
+) -> None:
+    with _play_generation_lock:
+        _play_queue.put((path, volume, on_complete, _play_generation, on_cancel))
+
+
+def _is_current_playback(generation: int) -> bool:
+    with _play_generation_lock:
+        return generation == _play_generation
+
+
+def _play_if_current(generation: int, action: Callable[[], None]) -> bool:
+    # Serialize the final native start with invalidation.
+    with _play_generation_lock:
+        if generation != _play_generation:
+            return False
+        action()
+        return True
+
+
+def cancel_pending_feedback() -> None:
+    """Invalidate queued feedback and stop looping, but not active playback.
+
+    This does not stop already-running native or subprocess audio. The caller
+    must handle those paths separately before claiming full mute isolation.
+    """
+    global _play_generation
+    with _play_generation_lock:
+        _play_generation += 1
+        stop_loop()
+
+
 def _ensure_worker() -> None:
     """Start the audio playback worker if not already running."""
     global _worker_started
@@ -148,7 +184,7 @@ def _audio_worker() -> None:
     Serializes sd.play()/sd.wait() calls to prevent concurrent access
     to PortAudio's global session (which is not thread-safe).
 
-    Items are ``(path_str, on_complete | None)`` or ``None`` (shutdown).
+    Items carry a playback generation or ``None`` (shutdown).
     When *on_complete* is set the worker blocks with ``sd.wait()`` until
     playback finishes, then invokes the callback.  Otherwise it fires
     ``sd.play()`` and immediately processes the next item (fire-and-forget).
@@ -158,8 +194,12 @@ def _audio_worker() -> None:
         if item is None:
             break
 
-        path_str, volume, on_complete = item
+        path_str, volume, on_complete, generation, on_cancel = item
+        cancelled = False
         try:
+            if not _is_current_playback(generation):
+                cancelled = True
+                continue
             cached = _sound_cache.get(path_str)
             if cached is not None:
                 data, sr = cached
@@ -173,18 +213,24 @@ def _audio_worker() -> None:
 
             from dictare.audio.capture import _run_with_timeout
 
-            _execute_audio_control(
+            started = _execute_audio_control(
                 "play_output",
                 lambda: _run_with_timeout(
-                    lambda: sd.play(
-                        data * volume if volume != 1.0 else data,
-                        sr,
-                        device=_output_device,
+                    lambda: _play_if_current(
+                        generation,
+                        lambda: sd.play(
+                            data * volume if volume != 1.0 else data,
+                            sr,
+                            device=_output_device,
+                        ),
                     ),
                     timeout_s=3.0,
                     label="output_open",
                 ),
             )
+            if started is False:
+                cancelled = True
+                continue
             if on_complete:
                 # sd.wait() can hang indefinitely on Linux (ALSA/PulseAudio).
                 # Poll with timeout to prevent FSM getting stuck in PLAYING.
@@ -205,8 +251,16 @@ def _audio_worker() -> None:
                     _time.sleep(_PLAYBACK_POLL_S)
         except Exception:
             logger.debug("Audio playback failed for %s", path_str, exc_info=True)
-            _play_sound_file_fallback(path_str)
+            if _is_current_playback(generation):
+                _play_sound_file_fallback(path_str)
+            else:
+                cancelled = True
         finally:
+            if cancelled and on_cancel:
+                try:
+                    on_cancel()
+                except Exception:
+                    pass
             if on_complete:
                 try:
                     on_complete()
@@ -228,8 +282,9 @@ def play_wav_sync(path: str | Path, timeout_s: float = 15.0) -> bool:
     """
     _ensure_worker()
     done = threading.Event()
-    _play_queue.put((str(path), 1.0, done.set))
-    return done.wait(timeout=timeout_s)
+    cancelled = threading.Event()
+    _enqueue_sound(str(path), 1.0, done.set, cancelled.set)
+    return done.wait(timeout=timeout_s) and not cancelled.is_set()
 
 def get_sound_for_event(audio_config: Any, name: str) -> tuple[bool, str]:
     """Check if a sound event is enabled and return its file path.
@@ -300,7 +355,7 @@ def play_sound_file(
             When set, the worker blocks (sd.wait) until done, then calls it.
     """
     _ensure_worker()
-    _play_queue.put((str(path), volume, on_complete))
+    _enqueue_sound(str(path), volume, on_complete)
 
 # ---------------------------------------------------------------------------
 # Loop support — plays a sound repeatedly until stop_loop() is called.
@@ -323,11 +378,12 @@ _loop_volume: float = 1.0          # volume for current loop
 def _enqueue_loop_next() -> None:
     """on_complete callback: schedule the next 1s chunk if still active."""
     global _loop_chunk_pos
-    if not _loop_active.is_set() or not _loop_chunk_keys:
-        return
-    key = _loop_chunk_keys[_loop_chunk_pos % len(_loop_chunk_keys)]
-    _loop_chunk_pos += 1
-    _play_queue.put((key, 1.0, _enqueue_loop_next))  # volume baked into chunk data
+    with _play_generation_lock:
+        if not _loop_active.is_set() or not _loop_chunk_keys:
+            return
+        key = _loop_chunk_keys[_loop_chunk_pos % len(_loop_chunk_keys)]
+        _loop_chunk_pos += 1
+        _enqueue_sound(key, 1.0, _enqueue_loop_next)  # volume baked into chunk data
 
 def _start_loop_now(path_str: str) -> None:
     """Internal: load, chunk, and kick off the loop immediately."""
@@ -388,10 +444,11 @@ def start_loop(path: str | Path, volume: float = 1.0) -> None:
 def stop_loop() -> None:
     """Stop the loop after the current 1s chunk finishes."""
     global _loop_pending_timer
-    if _loop_pending_timer is not None:
-        _loop_pending_timer.cancel()
-        _loop_pending_timer = None
-    _loop_active.clear()
+    with _play_generation_lock:
+        if _loop_pending_timer is not None:
+            _loop_pending_timer.cancel()
+            _loop_pending_timer = None
+        _loop_active.clear()
 
 def is_looping() -> bool:
     """Return True if a loop is currently active."""
