@@ -38,6 +38,18 @@ export async function saveSetting(
 	return r.json();
 }
 
+export async function saveSettings(values: Record<string, unknown>): Promise<void> {
+	const response = await fetch(`${API}/settings`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ values })
+	});
+	if (!response.ok) {
+		const data = await response.json();
+		throw new Error(data.detail || `Save failed: ${response.status}`);
+	}
+}
+
 export async function fetchTomlSection(section: string): Promise<string> {
 	const r = await fetch(`${API}/settings/toml-section/${section}`);
 	if (!r.ok) throw new Error(`Failed to load section: ${r.status}`);

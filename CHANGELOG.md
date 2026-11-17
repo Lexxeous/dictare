@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   selected Codex session instead of attempting to execute a resume binary.
 
 ### Development
+- Validate related settings form edits together before replacing the TOML file;
+  allow isolated worktrees to select a compatible contributor Python environment.
 - Add isolated source development with checkout-local state, alternate ports,
   explicit listening controls, and calculated development version labels.
 - Calculate release targets from pending change intent and current main tags;

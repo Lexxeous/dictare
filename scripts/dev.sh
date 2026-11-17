@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV_PYTHON="$ROOT_DIR/.venv/bin/python"
+VENV_PYTHON="${DICTARE_DEV_PYTHON:-$ROOT_DIR/.venv/bin/python}"
 DEV_DIR="$ROOT_DIR/.dictare-dev"
 DEV_CONFIG="$DEV_DIR/config.toml"
 API_PORT="${DICTARE_DEV_API_PORT:-18770}"

@@ -341,7 +341,7 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
 
     @app.post("/api/settings")
     async def update_setting(request: Request):
-        """Update a single config value. Send value="" to reset to Pydantic default."""
+        """Update one value or a validated form batch; empty strings reset defaults."""
         from pydantic import ValidationError
 
         from dictare.config import (
@@ -349,9 +349,24 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
             get_config_value,
             load_config,
             set_config_value,
+            set_config_values,
         )
 
         body = await request.json()
+        if not isinstance(body, dict):
+            raise HTTPException(status_code=400, detail="Expected a settings object")
+        if "values" in body:
+            values = body["values"]
+            if not isinstance(values, dict) or not values or any(not isinstance(key, str) or value is None or not isinstance(value, (str, bool, int, float)) for key, value in values.items()):
+                raise HTTPException(status_code=400, detail="Expected a nonempty object of form values")
+            try:
+                set_config_values({key: None if value == "" else str(value) for key, value in values.items()})
+                logger.info("settings.change keys=%s", sorted(values))
+                return {"status": "ok"}
+            except KeyError as error:
+                raise HTTPException(status_code=404, detail=str(error)) from error
+            except (ValueError, ValidationError) as error:
+                raise HTTPException(status_code=400, detail=str(error)) from error
         key = body.get("key", "")
         value = body.get("value")
         if not key:

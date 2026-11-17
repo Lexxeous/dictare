@@ -34,6 +34,9 @@ boundaries. Keep those documents aligned with the implementation.
 - Use the current configuration model and TOML helpers instead of introducing
   a second configuration path. Preserve unknown user settings and comments
   where existing TOML editing code does so.
+- Save related ordinary form fields through the validated settings batch API.
+  It validates all form values before one comment-preserving file replacement.
+  TOML sections, model operations, and shortcuts are separate save steps.
 - Do not add dependencies for a small local change. For substantial new
   functionality, review existing project code and maintained library options,
   then record any material adoption decision in the appropriate documentation.
