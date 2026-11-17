@@ -1,0 +1,3 @@
+name = "mute-isolation"
+bump = "patch"
+summary = "Prevent muted speech from triggering new audio feedback."

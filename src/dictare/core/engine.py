@@ -1132,6 +1132,8 @@ class DictareEngine:
         """Play a sound if the feedback policy allows it."""
         from dictare.audio.beep import get_sound_for_event, play_sound_file_async
 
+        if self._voice_muted:
+            return
         if not self._feedback_policy.should_play(
             event, self._agent_mgr.current_agent, self.config.audio,
         ):
