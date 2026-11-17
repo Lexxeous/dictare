@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guidance and explicit handling of unconfirmed shutdown requests.
 
 ### Fixed
+- Compact the logo/version header and use icon-only mobile menu controls, with
+  scrolling navigation that opens from the top over the active settings page.
 - Reject canceled capture jobs, results and watchdog events after Discard or a
   completed Stop, preventing late text or state changes after listening resumes.
 - Clear outdated settings validation errors when correcting or retrying a save,

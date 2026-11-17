@@ -234,8 +234,9 @@ A lost request connection is reported as unconfirmed rather than as success.
 
 Settings opens on **Home**, with Start listening / Stop listening controls,
 the current destination for your words, and voice-command and keyboard cheat
-sheets. Click the Dictare logo to return Home. On a narrow screen, use Menu
-to open navigation.
+sheets. Click the Dictare logo to return Home. On a narrow screen, use the menu
+icon to open navigation from the top. Select a page, use the close icon, or
+press Escape to close it.
 
 **Documentation** displays the README included with your installed copy as
 rendered Markdown. Reading it does not require GitHub or an internet connection;
