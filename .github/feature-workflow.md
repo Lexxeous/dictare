@@ -34,10 +34,10 @@ request. The integration branch is `develop`.
 - Independent features share the committed integration base. Do not stack
   unrelated feature branches. A real dependency requires a documented base
   and explicit plan; no automatic merging or cherry-picking of unrelated work.
-- Put common contributor infrastructure in a separate prerequisite branch.
-  Record its commit when using it as the shared base. Newly created branches
-  may advance to that common base only after verifying they have no work of
-  their own; never reset an existing implementation to do so.
+- Develop common contributor infrastructure separately, validate it, and
+  integrate it into develop before using it as a shared feature prerequisite.
+  Every feature branch must be based on develop. Refresh existing feature
+  branches from develop safely; never reset an implementation to a new base.
 
 ## Validate and commit checkpoints
 
@@ -69,11 +69,45 @@ At a coherent checkpoint:
    continue in size order. Further commits can complete later checkpoints.
 
 Keep **checkpoint committed**, **Ready for review**, **merged**, and
-**Released** distinct. Only claim each when its evidence exists. Do not bump
-the version for an ordinary contribution; maintainers coordinate releases.
-Pushing, opening a PR, merging, and publishing require the user's separate
-authorization. This workflow authorizes local request branch creation and
-validated checkpoint commits during requested feature implementation.
+**Released** distinct. Only claim each when its evidence exists. Merge a
+validated feature into develop as part of the requested implementation flow;
+do not merge while required acceptance or regression checks are unresolved.
+Select intermittent validated develop batches for main during an explicit
+release-preparation task. Publish real releases from main only. Pushing,
+opening remote PRs, or publishing still requires the user's authorization.
+
+## Release intent and development versions
+
+- Each feature records its release intent in the local request/register/roadmap.
+  Add the matching public `.changes/<request-name>.toml` with its first
+  implementation checkpoint: patch for compatible fixes, minor for added
+  capabilities, or none for contributor-only work. Never copy private notes.
+- Do not reserve a future numeric version per feature. Before push/merge,
+  refresh the fork's main/develop refs and stable tags, sync the feature with
+  develop, and run `.venv/bin/python scripts/release_plan.py --main-ref <fork-remote>/main`.
+  Record the recalculated target and the baseline ref/commit in local notes.
+  CI also recalculates the plan on feature/develop/main pushes and PRs.
+- A release batch uses the highest pending intent, with the pending main
+  release as a floor. Several fixes in one batch consume one patch version;
+  a minor feature promotes that batch to a minor release. A feature merged
+  after a completed main release recalculates against that new stable tag.
+  Already-released immutable intent records do not bump the next batch.
+  After a main release, merge main back into develop before creating or
+  refreshing feature branches so the released source version, tags, and
+  consumed intents become the new baseline.
+- The initial selected target is to finish 0.7.0, currently 0.7.0rc2 in source.
+  A patch arriving before that release joins 0.7.0. After 0.7.0 is released,
+  a patch-only batch targets 0.7.1 and a batch containing a minor feature
+  targets 0.8.0. Recompute after any change in release/merge order.
+- `--local-version` prints a target-based dev label containing commit distance,
+  branch, SHA, and dirty state. Use it for source-build identification; the
+  packaged source version remains the literal release version until release
+  preparation updates source and changelog together. Do not publish dev labels.
+- Release preparation on main must pass `--check-release`, which checks the
+  actual source version against the recalculated release line and requires
+  its changelog section. The publishing workflow rejects other branches.
+  CI checks are evidence only after they actually run remotely; configuring
+  required checks/branch protection in GitHub is a separate repository setting.
 
 ## Keep documentation current
 

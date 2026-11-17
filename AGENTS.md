@@ -82,6 +82,14 @@ authoritative request/branch/checkpoint workflow.
 - Do not push, open a pull request, merge, or create a release unless the user
   asks for that action.
 
+The standing feature workflow now permits merging validated implementations
+back into develop during requested feature work. All feature branches start
+from develop; main is reserved for selected release batches. Before push/merge,
+refresh release refs/tags and recalculate patch/minor intent using
+`scripts/release_plan.py`; keep local request/register/roadmap targets current.
+Publishing and remote pushes/PRs still require explicit authorization. Follow
+the detailed workflow for intent records, local dev labels, and main release gates.
+
 ## Private Local Feature Requests
 
 `feature-requests/` is ignored by Git on purpose. Put each independent request

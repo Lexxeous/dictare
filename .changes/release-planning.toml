@@ -1,0 +1,3 @@
+name = "release-planning"
+bump = "none"
+summary = "Track release intent and source development labels across the develop/main workflow."
