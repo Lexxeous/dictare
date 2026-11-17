@@ -2,66 +2,92 @@
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import shutil
 import subprocess
 import sys
 import threading
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Module-level tracking of the current audio subprocess.
-# Used by stop_audio_native() to interrupt playback from any thread/signal handler.
-_audio_lock = threading.Lock()
-_current_audio_proc: subprocess.Popen | None = None
+# Track every native player, not just the last one: cached speech may play
+# concurrently. A scoped generation invalidates synthesis that completes late.
+_audio_lock = threading.RLock()
+_audio_processes: set[subprocess.Popen] = set()
+_audio_generation = 0
+_audio_suspended = False
+_audio_scope: contextvars.ContextVar[int | None] = contextvars.ContextVar(
+    "dictare_tts_audio_generation", default=None,
+)
+
+
+def native_audio_generation() -> int:
+    with _audio_lock:
+        return -1 if _audio_suspended else _audio_generation
+
+
+@contextmanager
+def native_audio_scope(generation: int) -> Iterator[None]:
+    """Bind a synthesis request to the playback generation in which it began."""
+    token = _audio_scope.set(generation)
+    try:
+        yield
+    finally:
+        _audio_scope.reset(token)
+
 
 def stop_audio_native() -> bool:
-    """Kill the currently playing audio subprocess, if any.
-
-    Returns:
-        True if a process was found and terminated, False if nothing was playing.
-    """
-    global _current_audio_proc
+    """Interrupt all currently tracked native players."""
     with _audio_lock:
-        proc = _current_audio_proc
-    if proc is None:
-        return False
-    try:
-        proc.terminate()
-    except (ProcessLookupError, OSError):
-        pass
-    return True
+        processes = list(_audio_processes)
+        for proc in processes:
+            try:
+                proc.terminate()
+            except (ProcessLookupError, OSError):
+                pass
+    return bool(processes)
 
-def play_audio_native(path: str | Path, *, timeout: float = 120.0, volume: float = 1.0) -> None:
-    """Play an audio file using the native system player.
 
-    Uses afplay on macOS, paplay/aplay on Linux.  All three read file
-    headers (not extensions) so WAV, AIFF, and other formats work.
+def suspend_native_audio() -> None:
+    """Invalidate prior speech requests and stop all active native players."""
+    global _audio_generation, _audio_suspended
+    with _audio_lock:
+        _audio_generation += 1
+        _audio_suspended = True
+        stop_audio_native()
 
-    Args:
-        path: Path to audio file (WAV, AIFF, etc.).
-        timeout: Maximum playback time in seconds.
-        volume: Playback volume (0.0–1.0). Applied via player flags.
-    """
-    global _current_audio_proc
+
+def resume_native_audio() -> None:
+    """Allow only requests created after the most recent suspension."""
+    global _audio_suspended
+    with _audio_lock:
+        _audio_suspended = False
+
+
+def play_audio_native(path: str | Path, *, timeout: float = 120.0, volume: float = 1.0) -> bool:
+    """Play a file via a native player if the current request is permitted."""
     path_str = str(path)
-
     if sys.platform == "darwin":
         cmd = ["afplay", "-v", str(volume), path_str]
     elif shutil.which("paplay"):
-        # paplay volume: 0–65536 (100% = 65536)
         cmd = ["paplay", f"--volume={int(volume * 65536)}", path_str]
     elif shutil.which("aplay"):
-        cmd = ["aplay", "-q", path_str]  # aplay has no volume flag
+        cmd = ["aplay", "-q", path_str]
     else:
         logger.warning("No native audio player found (paplay/aplay)")
-        return
+        return False
 
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     with _audio_lock:
-        _current_audio_proc = proc
+        generation = _audio_scope.get()
+        if _audio_suspended or (generation is not None and generation != _audio_generation):
+            return False
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        _audio_processes.add(proc)
     try:
         proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -69,8 +95,8 @@ def play_audio_native(path: str | Path, *, timeout: float = 120.0, volume: float
         proc.wait()
     finally:
         with _audio_lock:
-            if _current_audio_proc is proc:
-                _current_audio_proc = None
+            _audio_processes.discard(proc)
+    return True
 
 class TTSEngine(ABC):
     """Abstract text-to-speech interface."""

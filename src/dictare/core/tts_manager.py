@@ -338,11 +338,14 @@ class TTSManager:
         from dictare.audio.beep import play_audio
 
         tts = self._tts_engine
+        from dictare.tts.base import native_audio_generation, native_audio_scope
+        generation = native_audio_generation()
         logger.info("TTS: chars=%d volume=%.2f", len(text), vol)
 
         def _do_tts() -> None:
             try:
-                ok = tts.speak(text, volume=vol)
+                with native_audio_scope(generation):
+                    ok = tts.speak(text, volume=vol)
                 if not ok:
                     logger.warning("TTS speak returned False")
             except Exception:
@@ -416,12 +419,15 @@ class TTSManager:
         # 0→1 sends PlayStarted, N→0 sends PlayCompleted.
         pause = not self._config.audio.headphones_mode
 
+        from dictare.tts.base import native_audio_generation, native_audio_scope
+        generation = native_audio_generation()
         start = time.time()
 
         if pause:
             self._play_start()
         try:
-            ok = tts.speak(text, **speak_kwargs)
+            with native_audio_scope(generation):
+                ok = tts.speak(text, **speak_kwargs)
         finally:
             if pause:
                 self._play_end()
