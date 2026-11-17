@@ -91,6 +91,10 @@ class MuteFilter:
                 matched_tokens = tokens[listen_match.start_idx : listen_match.end_idx + 1]
                 logger.info(
                     "listen_trigger",
+                    extra={"confidence": listen_match.confidence},
+                )
+                logger.debug(
+                    "listen_trigger_text",
                     extra={
                         "pattern": listen_match.pattern,
                         "matched_tokens": matched_tokens,
@@ -120,6 +124,10 @@ class MuteFilter:
             matched_tokens = tokens[mute_match.start_idx : mute_match.end_idx + 1]
             logger.info(
                 "mute_trigger",
+                extra={"confidence": mute_match.confidence},
+            )
+            logger.debug(
+                "mute_trigger_text",
                 extra={
                     "pattern": mute_match.pattern,
                     "matched_tokens": matched_tokens,

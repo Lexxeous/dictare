@@ -1,11 +1,16 @@
-"""Tests for agent CLI logging (banner → log, truncation, --verbose)."""
+"""Tests for agent logging and explicit transcript-content opt-in."""
 
 from __future__ import annotations
 
 import json
+import queue
+import threading
 from unittest.mock import patch
 
-from dictare.agent.mux import run_agent
+import pytest
+from openvip.models import Transcription
+
+from dictare.agent.mux import _read_from_sse, _write_to_pty, run_agent
 
 
 def _make_status(agents: list[str]):
@@ -73,36 +78,42 @@ class TestAgentBannerLogged:
         assert "server" in agent_start[0]
         assert "command" in agent_start[0]
 
-class TestSessionTruncation:
-    """Session log truncates text to 20 chars (not 50) with [...] suffix."""
+@pytest.mark.parametrize("verbose", [False, True])
+@pytest.mark.parametrize("text", ["private sentence", "Confidential words beyond the old twenty character preview", "Privé 日本語"])
+def test_session_content_requires_verbose_without_changing_delivery(tmp_path, text, verbose):
+    """Exercise actual SDK receive, PTY delivery and every associated disk event."""
+    path = tmp_path / "session.jsonl"
+    trigger = "private spoken command"
+    message = Transcription.from_dict({
+        "openvip": "1.0", "type": "transcription",
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "timestamp": "2026-01-01T00:00:00Z", "text": text,
+        "x_input": {"ops": ["submit"], "trigger": trigger},
+    })
+    pending: queue.Queue = queue.Queue()
+    with patch("openvip.Client") as client:
+        client.return_value.subscribe.return_value = [message]
+        _read_from_sse("test", "http://127.0.0.1:9999", pending, threading.Event(), path, verbose=verbose)
 
-    @staticmethod
-    def _truncate(text: str, verbose: bool = False) -> str:
-        """Replicate the truncation logic from mux.py."""
-        if verbose:
-            return text
-        return text[:20] + "[...]" if len(text) > 20 else text
+    writes = []
+    pending.put(("error", "test completed"))
+    with patch("os.write", side_effect=lambda fd, data: writes.append(data) or len(data)), patch("termios.tcdrain"):
+        _write_to_pty(99, pending, threading.Event(), path, verbose=verbose)
+    assert writes == [text.encode(), b"\r"]
 
-    def test_short_text_not_truncated(self) -> None:
-        assert self._truncate("hello world") == "hello world"
-
-    def test_exactly_20_not_truncated(self) -> None:
-        text = "a" * 20
-        assert self._truncate(text) == text
-
-    def test_21_chars_truncated(self) -> None:
-        text = "a" * 21
-        assert self._truncate(text) == "a" * 20 + "[...]"
-
-    def test_long_text_truncated(self) -> None:
-        text = "This is a long transcription that should be truncated to twenty characters"
-        result = self._truncate(text)
-        assert result == "This is a long trans[...]"
-        assert len(result) == 25  # 20 + len("[...]")
-
-    def test_verbose_no_truncation(self) -> None:
-        text = "This is a long transcription that should NOT be truncated when verbose"
-        assert self._truncate(text, verbose=True) == text
+    entries = [json.loads(line) for line in path.read_text().splitlines()]
+    read = next(entry for entry in entries if entry["event"] == "msg_read")
+    sent = next(entry for entry in entries if entry["event"] == "msg_sent")
+    assert read["chars"] == sent["chars"] == len(text)
+    assert sent["submit"] is True
+    assert sent["text_bytes"] == len(text.encode())
+    if verbose:
+        assert read["text"] == sent["text"] == text
+        assert sent["submit_trigger"] == trigger
+    else:
+        assert all("text" not in entry and "submit_trigger" not in entry for entry in entries)
+        assert text not in path.read_text()
+        assert trigger not in path.read_text()
 
 class TestRunAgentNoQuietParam:
     """Verify --quiet parameter has been removed from run_agent."""

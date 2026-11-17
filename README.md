@@ -264,6 +264,23 @@ applies. Resume works after voice mute; use Home or your shortcut to start
 fully stopped listening. Voice mute currently keeps recognition active to hear
 Resume; it does not turn off microphone capture.
 
+## Privacy and local diagnostics
+
+Normal dictation processes microphone audio in memory. The latest transcript
+stays in memory for resend and status; Dictare does not create a transcript
+history or save microphone recordings in its normal dictation path.
+
+Operational logs retain counts, timing, delivery status, session/destination
+identifiers, and launch metadata. Normal logs omit transcript previews and
+recognized command text. Agent `--verbose` and engine debug logging can include
+spoken content; enable them only when needed and review logs before sharing.
+This change does not remove content from older log files.
+
+Aggregate usage statistics are saved locally. Speech synthesis can cache
+generated audio under Dictare's data directory (`tts-cache`); this is separate
+from microphone recordings. An assistant receiving your words may store its
+own conversation history, which Dictare does not manage or delete.
+
 ## Keyboard Mode
 
 No agent? Use dictare as a dictation tool — voice to keystrokes in any app.

@@ -42,6 +42,11 @@ boundaries. Keep those documents aligned with the implementation.
   actions together, and display effective saved defaults rather than the
   generic schema's intentionally blank unset string fields. Do not expose
   unrelated configuration values in validation errors.
+- Keep transcript and recognized-command content out of ordinary operational
+  logs. Detailed text requires explicit verbose/debug diagnostics. Exercise
+  actual receive/delivery/logging paths in privacy tests rather than copying
+  truncation or redaction expressions into tests. Document persistent counts,
+  metadata, synthesis caches and agent-owned history separately.
 - Do not add dependencies for a small local change. For substantial new
   functionality, review existing project code and maintained library options,
   then record any material adoption decision in the appropriate documentation.

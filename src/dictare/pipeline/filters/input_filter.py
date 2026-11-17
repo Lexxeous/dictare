@@ -115,6 +115,10 @@ class InputFilter:
             # Log trigger detection (standard logging)
             logger.info(
                 "submit_trigger",
+                extra={"confidence": match.confidence},
+            )
+            logger.debug(
+                "submit_trigger_text",
                 extra={
                     "pattern": match.pattern,
                     "matched_tokens": matched_tokens,

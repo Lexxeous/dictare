@@ -249,7 +249,7 @@ class TestJSONLLoggerInjection:
         assert entry["success"] is True
         assert entry["auto_submit"] is True
         assert entry["enter_sent"] is True
-        assert entry["submit_trigger"] == "ok send"
+        assert "submit_trigger" not in entry
         assert entry["submit_confidence"] == 0.9
         assert entry["inject_ms"] == 15.8
         assert "text" not in entry
@@ -257,11 +257,12 @@ class TestJSONLLoggerInjection:
     def test_injection_verbose_includes_text(self, tmp_path: Path) -> None:
         log_path = tmp_path / "test.jsonl"
         with JSONLLogger(log_path, version="1.0.0", params={"verbose": True}) as logger:
-            logger.log_injection("hello", method="ydotool", success=True)
+            logger.log_injection("hello", method="ydotool", success=True, submit_trigger="ok send")
 
         lines = log_path.read_text().strip().splitlines()
         entry = json.loads(lines[-2])
         assert entry["text"] == "hello"
+        assert entry["submit_trigger"] == "ok send"
 
 
 class TestJSONLLoggerVadEvent:

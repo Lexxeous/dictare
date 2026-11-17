@@ -54,18 +54,13 @@ class MuteExecutor:
         action = x_mute.get("action")
         if action == "mute":
             self.mute_fn()
-            logger.info(
-                "mute_executed",
-                extra={"trigger": x_mute.get("trigger")},
-            )
+            logger.info("mute_executed")
         elif action == "unmute":
             self.unmute_fn()
-            logger.info(
-                "unmute_executed",
-                extra={"trigger": x_mute.get("trigger")},
-            )
+            logger.info("unmute_executed")
         else:
             logger.warning("unknown_mute_action: %s", action)
             return PipelineResult.passed(message)
 
+        logger.debug("mute_action_text", extra={"trigger": x_mute.get("trigger")})
         return PipelineResult.consumed()

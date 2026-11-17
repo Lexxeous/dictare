@@ -1351,7 +1351,7 @@ class DictareEngine:
         if not self._last_text:
             logger.debug("resend_last: no last text to resend")
             return False
-        logger.info("resend_last: resending %r", self._last_text)
+        logger.info("resend_last: resending chars=%d", len(self._last_text))
         self.inject_text(self._last_text)
         return True
 

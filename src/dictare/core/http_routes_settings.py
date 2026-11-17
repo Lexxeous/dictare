@@ -388,7 +388,7 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
                 set_config_value(key, str(value))
             config = load_config()
             current = get_config_value(key, config)
-            logger.info("settings.change key=%s value=%r", key, current)
+            logger.info("settings.change key=%s", key)
             return {"status": "ok", "key": key, "value": current}
         except KeyError as e:
             raise HTTPException(status_code=404, detail=str(e))

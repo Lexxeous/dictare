@@ -506,7 +506,7 @@ class TestWriteToPtySeparateEsc:
         sent_event = next(e for e in events if e["event"] == "msg_sent")
 
         assert submit_event["bytes"] == 1
-        assert submit_event["submit_trigger"] == "<double_tap>"
+        assert "submit_trigger" not in submit_event
         assert sent_event["text_bytes"] == len(b"hello world")
         assert sent_event["visual_newline_bytes"] == 0
         assert sent_event["submit_bytes"] == 1

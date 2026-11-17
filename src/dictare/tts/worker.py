@@ -199,7 +199,7 @@ def main(argv: list[str] | None = None) -> None:
         message_id = str(msg.id)
         voice = msg.voice
         language = msg.language
-        logger.info("Speaking: %r (id=%s, voice=%s, lang=%s)", text, message_id, voice, language)
+        logger.info("Speaking: chars=%d (id=%s, voice=%s, lang=%s)", len(text), message_id, voice, language)
 
         # Fast-path: cached audio → play on background thread (non-blocking)
         cached_path = tts_engine.check_cache(text, voice=voice, language=language)
@@ -219,7 +219,7 @@ def main(argv: list[str] | None = None) -> None:
         try:
             ok = tts_engine.speak(text, voice=voice, language=language)
         except Exception:
-            logger.warning("TTS speak failed for %r", text, exc_info=True)
+            logger.warning("TTS speak failed (id=%s)", message_id, exc_info=True)
             ok = False
         duration_ms = int((time.time() - start) * 1000)
 

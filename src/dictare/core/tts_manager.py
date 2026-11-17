@@ -321,10 +321,10 @@ class TTSManager:
             text: Text to speak.
         """
         if self._tts_error:
-            logger.warning("speak_text(%r): TTS failed to load: %s", text, self._tts_error)
+            logger.warning("speak_text: TTS failed to load: %s", self._tts_error)
             return
         if self._tts_engine is None:
-            logger.warning("speak_text(%r): TTS engine not loaded", text)
+            logger.warning("speak_text: TTS engine not loaded")
             return
 
         from dictare.audio.beep import get_sound_for_event, get_volume_for_event
@@ -338,15 +338,15 @@ class TTSManager:
         from dictare.audio.beep import play_audio
 
         tts = self._tts_engine
-        logger.info("TTS: %r (volume=%.2f)", text, vol)
+        logger.info("TTS: chars=%d volume=%.2f", len(text), vol)
 
         def _do_tts() -> None:
             try:
                 ok = tts.speak(text, volume=vol)
                 if not ok:
-                    logger.warning("TTS speak(%r) returned False", text)
+                    logger.warning("TTS speak returned False")
             except Exception:
-                logger.warning("TTS speak failed for %r", text, exc_info=True)
+                logger.warning("TTS speak failed", exc_info=True)
 
         pause = not self._config.audio.headphones_mode
         play_audio(_do_tts, pause_mic=pause, controller=self._controller)

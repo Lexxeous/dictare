@@ -91,13 +91,16 @@ def _write_session_end(
         f.write(json.dumps(metadata, ensure_ascii=False) + "\n")
         f.flush()
 
-def _log_event(session_path: Path, event: str, data: dict) -> None:
-    """Log an event to the session log file (thread-safe)."""
+def _log_event(
+    session_path: Path, event: str, data: dict, *, verbose: bool = False,
+) -> None:
+    """Log operational metadata; transcript content requires explicit verbose mode."""
     try:
         log_entry = {
             "event": event,
             "ts": datetime.now(UTC).isoformat(),
-            **data,
+            **{key: value for key, value in data.items()
+               if verbose or key not in {"text", "submit_trigger"}},
         }
         with open(session_path, "a") as f:
             f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
@@ -702,7 +705,7 @@ def _read_from_sse(
                 text = msg.text or ""
                 _log_event(session_path, "msg_read", {
                     "seq": msg_count,
-                    "text": text if verbose else (text[:20] + "[...]" if len(text) > 20 else text),
+                    "text": text,
                     "chars": len(text),
                     "openvip_id": msg_id,
                     "x_input_ops": list(x_input_ops),
@@ -711,7 +714,7 @@ def _read_from_sse(
                     "x_input_source": _openvip_meta.get("x_input_source"),
                     "submit_trigger": _openvip_meta.get("submit_trigger"),
                     "keystrokes": keystroke_counter.count if keystroke_counter else 0,
-                })
+                }, verbose=verbose)
 
             result = input_executor.process(msg_dict)
             if result.action == PipelineAction.PASS:
@@ -790,7 +793,7 @@ def _write_to_pty(
                         "openvip_id": data.get("openvip_id"),
                         "openvip_ts": data.get("openvip_ts"),
                         "keystrokes": keystroke_counter.count if keystroke_counter else 0,
-                    })
+                    }, verbose=verbose)
 
                 # Write text and control sequences as SEPARATE writes.
                 # Escape sequences (\x1b) must not be in the same buffer
@@ -843,7 +846,7 @@ def _write_to_pty(
                             "delay_s": delay_s,
                             "openvip_id": data.get("openvip_id"),
                             "submit_trigger": data.get("submit_trigger"),
-                        })
+                        }, verbose=verbose)
 
                 # Log message AFTER successful write AND drain
                 if session_path:
@@ -855,7 +858,7 @@ def _write_to_pty(
                     )
                     _log_event(session_path, "msg_sent", {
                         "seq": msg_count,
-                        "text": text if verbose else (text[:20] + "[...]" if len(text) > 20 else text),
+                        "text": text,
                         "chars": len(text),
                         "bytes": bytes_written,
                         "text_bytes": text_bytes_written,
@@ -868,7 +871,7 @@ def _write_to_pty(
                         "openvip_id": data.get("openvip_id"),
                         "openvip_ts": data.get("openvip_ts"),
                         "keystrokes": keystroke_counter.count if keystroke_counter else 0,
-                    })
+                    }, verbose=verbose)
         except (BrokenPipeError, OSError) as e:
             if session_path:
                 _log_event(session_path, "writer_error", {"error": str(e), "msg_count": msg_count})
