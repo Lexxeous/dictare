@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Show profile/continuation options in agent help and explain nested service help.
+- Add a confirmed whole-engine stop control to settings, with stopped-state
+  guidance and explicit handling of unconfirmed shutdown requests.
 
 ### Fixed
 - Treat a trailing resume as named-agent continuation; resolve and display the

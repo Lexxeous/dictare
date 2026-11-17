@@ -1,0 +1,3 @@
+name = "local-settings-stop-engine"
+bump = "minor"
+summary = "Stop the entire engine from local settings with confirmation and restart guidance."

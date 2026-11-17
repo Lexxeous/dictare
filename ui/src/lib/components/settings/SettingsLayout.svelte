@@ -3,6 +3,7 @@
 	import SettingsSection from "./SettingsSection.svelte";
 	import SaveBar from "./SaveBar.svelte";
 	import EngineStatusBar from "./EngineStatusBar.svelte";
+	import EngineStopControl from "./EngineStopControl.svelte";
 	import DashboardPage from "$lib/components/dashboard/DashboardPage.svelte";
 	import ModelsPage from "$lib/components/models/ModelsPage.svelte";
 	import { Button } from "$lib/components/ui/button";
@@ -180,8 +181,9 @@
 
 <div class="flex h-screen">
 	<SettingsNav {tabs} bind:activeNavId version={schema?.version ?? ""} />
-	<main class="flex-1 overflow-y-auto" style="padding-bottom: {fixedBottomPx}px">
+	<main class="min-w-0 flex-1 overflow-y-auto" style="padding-bottom: {fixedBottomPx}px">
 		<div class="max-w-2xl mx-auto pt-14 pb-8">
+			<EngineStopControl />
 			{#if activeNavId === "dashboard"}
 				<div class="px-4 mb-8">
 					<h2 class="text-xl font-semibold mb-1.5">{activeLabel}</h2>
@@ -341,6 +343,8 @@
 			{/if}
 		</div>
 	</main>
-	<SaveBar />
+	{#if !settingsStore.getEngineShutdownRequested()}
+		<SaveBar />
+	{/if}
 	<EngineStatusBar />
 </div>

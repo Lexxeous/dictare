@@ -265,6 +265,18 @@ export async function restartEngine(): Promise<void> {
 	}
 }
 
+export async function stopEngine(): Promise<void> {
+	const response = await fetch(`${OPENVIP}/control`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ command: "engine.shutdown" }),
+		signal: AbortSignal.timeout(5000)
+	});
+	if (!response.ok) throw new Error(`Stop request failed: ${response.status}`);
+	const result = await response.json();
+	if (result.status !== "ok") throw new Error("Engine did not accept the stop request");
+}
+
 // ----- TTS Venv Install/Uninstall API -----
 
 export async function installTtsEngine(engine: string): Promise<string> {
