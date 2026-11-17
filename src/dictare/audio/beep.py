@@ -184,11 +184,18 @@ def suspend_feedback(*, stop_active: bool = True) -> None:
         _feedback_suspended = True
         _play_generation += 1
         stop_loop()
-        if _fallback_process is not None:
+        proc = _fallback_process
+        if proc is not None:
             try:
-                _fallback_process.terminate()
+                proc.terminate()
             except (ProcessLookupError, OSError):
                 pass
+    if proc is not None:
+        try:
+            proc.wait(timeout=2.0)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=1.0)
     if stop_active:
         stop_portaudio_output()
 

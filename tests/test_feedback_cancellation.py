@@ -108,3 +108,15 @@ def test_suspension_terminates_active_fallback_player(monkeypatch):
         beep.resume_feedback()
         worker.join(timeout=2)
     assert not worker.is_alive()
+
+
+def test_suspension_waits_for_fallback_to_exit(monkeypatch):
+    process = MagicMock()
+    monkeypatch.setattr(beep, "_fallback_process", process)
+    monkeypatch.setattr(beep, "stop_portaudio_output", lambda: None)
+    try:
+        beep.suspend_feedback()
+        process.terminate.assert_called_once()
+        process.wait.assert_called_once_with(timeout=2.0)
+    finally:
+        beep.resume_feedback()

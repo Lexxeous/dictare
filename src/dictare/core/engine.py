@@ -1342,7 +1342,8 @@ class DictareEngine:
                     logger.exception("Could not stop speech playback")
                 self.discard_current_internal()
                 self._controller.send(StrictMuted(source="strict_mute"))
-            suspend_native_audio()
+            if suspend_native_audio() is False:
+                self._strict_audio_error = "Could not confirm speech playback stopped."
             try:
                 suspend_feedback()
             except Exception:
@@ -1803,7 +1804,8 @@ class DictareEngine:
             from dictare.audio.beep import suspend_feedback
             from dictare.tts.base import suspend_native_audio
 
-            suspend_native_audio()
+            if suspend_native_audio() is False:
+                self._strict_audio_error = "Could not confirm speech playback stopped."
             suspend_feedback(stop_active=False)
 
         # Start audio streaming (always needed for VAD to work)

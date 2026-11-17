@@ -88,13 +88,13 @@ def stop_audio_native(*, wait: bool = False) -> bool:
     return bool(processes) if not wait else True
 
 
-def suspend_native_audio() -> None:
-    """Invalidate prior speech requests and stop all active native players."""
+def suspend_native_audio() -> bool:
+    """Invalidate prior speech requests and wait for active players to stop."""
     global _audio_generation, _audio_suspended
     with _audio_lock:
         _audio_generation += 1
         _audio_suspended = True
-        stop_audio_native()
+    return stop_audio_native(wait=True)
 
 
 def resume_native_audio() -> None:

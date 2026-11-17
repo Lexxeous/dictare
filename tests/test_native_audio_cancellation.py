@@ -69,3 +69,19 @@ def test_revoked_worker_permit_blocks_player_before_and_after_spawn(monkeypatch)
     with base.native_playback_permit(lambda: next(permits)):
         assert not base.play_audio_native("revoked.wav")
     process.terminate.assert_called_once()
+
+
+def test_suspension_reports_failure_if_a_player_cannot_be_stopped(monkeypatch):
+    import subprocess
+
+    process = MagicMock()
+    process.wait.side_effect = subprocess.TimeoutExpired("player", 0.1)
+    with base._audio_lock:
+        base._audio_processes.add(process)
+    try:
+        assert not base.suspend_native_audio()
+        process.kill.assert_called_once()
+    finally:
+        with base._audio_lock:
+            base._audio_processes.discard(process)
+        base.resume_native_audio()
