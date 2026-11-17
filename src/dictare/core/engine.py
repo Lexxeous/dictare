@@ -28,6 +28,7 @@ from dictare.core.fsm import (
     TranscriptionCompleted,
 )
 from dictare.core.openvip_messages import create_message
+from dictare.core.prompt_review import ReviewSlot, ReviewSnapshot
 from dictare.core.status_report import build_status, check_launcher_hash
 from dictare.core.tts_manager import TTSManager
 from dictare.hotkey.base import HotkeyListener
@@ -190,6 +191,7 @@ class DictareEngine:
         self.requested_exit_code = 0
         self.requested_exit_reason = "normal"
         self._injection_lock = threading.RLock()  # Serialize capture cancellation and delivery.
+        self._review_slot = ReviewSlot()
         self._logger = logger
 
         # Pipelines for message processing
@@ -1062,6 +1064,39 @@ class DictareEngine:
                 submit_confidence=submit_confidence,
                 inject_ms=inject_elapsed * 1000,
             )
+
+    def review_snapshot(self) -> ReviewSnapshot | None:
+        """Return an in-memory review draft, if one has been captured."""
+        return self._review_slot.snapshot()
+
+    def discard_review(self, draft_id: str) -> bool:
+        """Discard a matching draft without restarting listening."""
+        return self._review_slot.discard(draft_id)
+
+    def send_review(self, draft_id: str) -> str:
+        """Send a claimed draft only to its frozen destination.
+
+        Returns scheduled, failed, partial, or unavailable. A successful
+        transport call is not a remote acknowledgement. Delivery is never
+        retried automatically; unsent messages remain in the slot.
+        """
+        claim = self._review_slot.claim(draft_id)
+        if claim is None:
+            return "unavailable"
+        delivered = 0
+        try:
+            for message in claim.messages:
+                if not claim.agent.send(message):
+                    break
+                delivered += 1
+        except Exception:
+            # Exception messages may contain transcript content.
+            logger.warning("review delivery failed for agent %s", claim.agent.id)
+        finally:
+            self._review_slot.finish(claim, delivered)
+        if delivered == len(claim.messages):
+            return "scheduled"
+        return "partial" if delivered else "failed"
 
     # -------------------------------------------------------------------------
     # Audio Feedback
