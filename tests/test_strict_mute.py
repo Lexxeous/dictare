@@ -64,11 +64,11 @@ def test_strict_mute_does_not_bypass_pending_review(monkeypatch):
     engine.tts_mgr = MagicMock()
     draft = engine._review_slot.hold(UnavailableReviewAgent("codex"), [{"text": "pending"}])
     assert draft is not None
-    engine.strict_mute()
-    engine._controller._handle_event(engine._controller._queue.get_nowait())
-    engine._controller._handle_event(HotkeyPressed(source="hotkey"))
-    assert engine._strict_muted
+    assert not engine.strict_mute()
+    assert not engine._strict_muted
     assert engine.discard_review(draft.id)
+    assert engine.strict_mute()
+    engine._controller._handle_event(engine._controller._queue.get_nowait())
     engine._controller._handle_event(HotkeyPressed(source="hotkey"))
     engine._controller._handle_event(engine._controller._queue.get_nowait())
     assert not engine._strict_muted and engine.state == AppState.LISTENING
@@ -148,3 +148,22 @@ def test_status_reports_strict_gate_and_failure_separately(monkeypatch):
     assert status["platform"]["strict_mute_pending"] is True
     assert status["platform"]["strict_mute_error"] == "Could not close the microphone input."
     assert resolve_display_state(status["platform"]) == ("strict_muted", "dim")
+
+
+def test_strict_command_requires_a_hotkey_or_source_test_mode(monkeypatch):
+    from dictare.core.prompt_review import UnavailableReviewAgent
+
+    monkeypatch.delenv("DICTARE_DEV_MODE", raising=False)
+    monkeypatch.setattr("dictare.core.status_report.hotkey_active", lambda engine: False)
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine.strict_mute = MagicMock()
+    assert engine.handle_protocol_command({"command": "stt.strict_mute"})["status"] == "error"
+    engine.strict_mute.assert_not_called()
+    monkeypatch.setenv("DICTARE_DEV_MODE", "1")
+    draft = engine._review_slot.hold(UnavailableReviewAgent("codex"), [{"text": "pending"}])
+    assert draft is not None
+    assert engine.handle_protocol_command({"command": "stt.strict_mute"})["status"] == "error"
+    engine.strict_mute.assert_not_called()
+    assert engine._review_slot.discard(draft.id)
+    assert engine.handle_protocol_command({"command": "stt.strict_mute"})["status"] == "ok"
+    engine.strict_mute.assert_called_once()

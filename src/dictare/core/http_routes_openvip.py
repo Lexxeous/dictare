@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Protocol commands handled by the engine directly
-PROTOCOL_COMMANDS = {"stt.start", "stt.stop", "stt.toggle", "engine.shutdown", "engine.restart", "ping", "hotkey.capture"}
+PROTOCOL_COMMANDS = {"stt.start", "stt.stop", "stt.toggle", "stt.strict_mute", "engine.shutdown", "engine.restart", "ping", "hotkey.capture"}
 
 # Max concurrent SSE status streams (safety net for tab leaks)
 _MAX_STATUS_STREAMS: int = 5
@@ -286,6 +286,10 @@ def register_openvip_routes(app: FastAPI, server: OpenVIPServer) -> None:
         """
         body = await request.json()
         command = body.get("command", "")
+        if command == "stt.strict_mute":
+            from dictare.core.http_routes_review import _require_local_request
+
+            _require_local_request(request)
         try:
             # Protocol commands → engine
             if command in PROTOCOL_COMMANDS:

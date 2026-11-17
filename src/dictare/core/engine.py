@@ -1315,7 +1315,7 @@ class DictareEngine:
 
         self._notify_status()
 
-    def strict_mute(self) -> None:
+    def strict_mute(self) -> bool:
         """Gate capture and close input; the physical hotkey resumes it.
 
         Kept internal until queued audio and TTS cancellation are implemented.
@@ -1325,8 +1325,10 @@ class DictareEngine:
 
         with self._strict_mute_transition_lock:
             with self._injection_lock:
+                if self.review_pending():
+                    return False
                 if self._strict_muted:
-                    return
+                    return True
                 self._strict_muted = True
                 self._strict_transitioning = True
                 self._strict_audio_error = None
@@ -1356,6 +1358,7 @@ class DictareEngine:
                     logger.exception("Could not close strict-muted input")
             self._strict_transitioning = False
             self._notify_status()
+            return True
 
     def resume_strict_mute(self) -> None:
         """Resume the strict gate only through the controller's hotkey path."""
@@ -1681,6 +1684,21 @@ class DictareEngine:
             Response dict.
         """
         command = body.get("command", "")
+
+        if command == "stt.strict_mute":
+            import os
+
+            from dictare.core.status_report import hotkey_active
+
+            if self.review_pending():
+                return {"openvip": "1.0", "status": "error", "error": "Resolve the pending prompt first."}
+            if not self._strict_muted and os.environ.get("DICTARE_DEV_MODE") != "1" and not hotkey_active(self):
+                return {"openvip": "1.0", "status": "error", "error": "A working hotkey is required for strict mute."}
+            if self.strict_mute() is False:
+                return {"openvip": "1.0", "status": "error", "error": "Resolve the pending prompt first."}
+            if self._strict_audio_error:
+                return {"openvip": "1.0", "status": "error", "error": self._strict_audio_error, "strict_muted": True}
+            return {"openvip": "1.0", "status": "ok", "strict_muted": True}
 
         if command in {"stt.start", "stt.toggle"} and self._strict_muted:
             return {"openvip": "1.0", "status": "error", "error": "Use the hotkey to resume from strict mute."}

@@ -23,3 +23,15 @@ def test_development_hotkey_is_not_registered_in_normal_runtime(monkeypatch):
     server = OpenVIPServer(MagicMock(), MagicMock())
     client = TestClient(server._app)
     assert client.post("/api/dev/hotkey").status_code == 404
+
+
+def test_strict_mute_protocol_rejects_cross_origin(monkeypatch):
+    monkeypatch.setenv("DICTARE_DEV_MODE", "1")
+    engine = MagicMock()
+    engine.handle_protocol_command.return_value = {"status": "ok"}
+    server = OpenVIPServer(engine, MagicMock())
+    client = TestClient(server._app, base_url="http://127.0.0.1:18770", client=("127.0.0.1", 1234))
+    assert client.post("/openvip/control", json={"command": "stt.strict_mute"}, headers={"Origin": "https://attacker.example"}).status_code == 403
+    engine.handle_protocol_command.assert_not_called()
+    assert client.post("/openvip/control", json={"command": "stt.strict_mute"}, headers={"Origin": "http://127.0.0.1:18770"}).json() == {"status": "ok"}
+    engine.handle_protocol_command.assert_called_once()
