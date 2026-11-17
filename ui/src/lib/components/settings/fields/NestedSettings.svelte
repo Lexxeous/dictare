@@ -3,6 +3,7 @@
 	import { resolveFieldSchema } from "$lib/schema";
 	import FieldRenderer from "../FieldRenderer.svelte";
 	import TomlField from "./TomlField.svelte";
+	import PatternSettings from "./PatternSettings.svelte";
 	import * as settingsStore from "$lib/stores/settings.svelte";
 
 	type Group = "audio.advanced" | "stt.advanced" | "pipeline.mute_filter" | "pipeline.submit_filter" | "pipeline.agent_filter";
@@ -58,6 +59,12 @@
 	{#each fields as field (field.key)}
 		<FieldRenderer {field} {schema} nestedForm />
 	{/each}
+	{#if section === "pipeline.mute_filter"}
+		<PatternSettings settingKey="pipeline.mute_filter.mute_triggers" label="Mute command patterns" />
+		<PatternSettings settingKey="pipeline.mute_filter.listen_triggers" label="Resume command patterns" />
+	{:else if section === "pipeline.submit_filter"}
+		<PatternSettings settingKey="pipeline.submit_filter.triggers" label="Send command patterns" />
+	{/if}
 	{#if section === "pipeline.agent_filter" || section === "pipeline.mute_filter"}
 		{@const listKey = section === "pipeline.agent_filter" ? "pipeline.agent_filter.triggers" : "pipeline.mute_filter.listen_phrases"}
 		<div class="px-4 py-3">

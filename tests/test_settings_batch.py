@@ -162,7 +162,7 @@ def test_pipeline_scalar_settings_preserve_patterns(path):
 
 def test_pipeline_complex_settings_cannot_be_replaced_by_scalar_form(path):
     original = path.read_bytes()
-    with pytest.raises(KeyError):
+    with pytest.raises(ValueError):
         set_config_values({'pipeline.mute_filter.mute_triggers': 'bad'}, path)
     assert path.read_bytes() == original
 
@@ -233,3 +233,29 @@ def test_empty_profile_command_is_rejected(path):
     with pytest.raises(ValueError):
         set_config_values({}, path, profile_updates={'codex': {'command': []}})
     assert path.read_bytes() == original
+
+
+def test_language_patterns_are_validated_and_saved_without_touching_other_settings(path):
+    path.write_text('[pipeline.mute_filter.mute_triggers]\nes = [["vale", "silencio"]] # keep\n')
+    client = TestClient(OpenVIPServer(MockEngine(), MockController(), port=0)._app)
+    patterns = {'*': [['dictare|okay', 'mute']], 'es': [['vale', 'silencio']]}
+    response = client.post('/api/settings', json={'values': {'pipeline.mute_filter.mute_triggers': patterns}})
+    assert response.status_code == 200
+    assert load_config(path).pipeline.mute_filter.mute_triggers == patterns
+    assert '# keep' in path.read_text()
+
+
+def test_invalid_patterns_and_arbitrary_objects_do_not_partially_save(path):
+    original = path.read_bytes()
+    client = TestClient(OpenVIPServer(MockEngine(), MockController(), port=0)._app)
+    for key, value in [('pipeline.mute_filter.mute_triggers', {'es': ['not a pattern']}), ('editor', {'bad': 'value'})]:
+        response = client.post('/api/settings', json={'values': {'editor': 'new', key: value}})
+        assert response.status_code in (400, 404)
+        assert path.read_bytes() == original
+
+
+def test_editing_a_language_pattern_keeps_its_inline_comment(path):
+    path.write_text('[pipeline.mute_filter.mute_triggers]\nes = [["vale", "silencio"]] # keep\n')
+    set_config_values({'pipeline.mute_filter.mute_triggers': {'es': [['vale', 'mudo']]}}, path)
+    assert load_config(path).pipeline.mute_filter.mute_triggers['es'] == [['vale', 'mudo']]
+    assert '# keep' in path.read_text()

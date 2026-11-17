@@ -756,7 +756,7 @@ def _stamp_version(doc: Any) -> None:
     doc["_version"] = f"dictare/{__version__}"
 
 def set_config_values(
-    updates: dict[str, str | list[str] | None],
+    updates: dict[str, str | list[str] | dict[str, list[list[str]]] | None],
     config_path: Path | None = None,
     *,
     profile_updates: dict[str, dict[str, Any]] | None = None,
@@ -800,12 +800,25 @@ def set_config_values(
             if field not in current_group or field not in default_group:
                 raise KeyError(f"Unknown config key: {key}")
             current = current_group[field]
+            parsed: Any
             list_fields = {"pipeline.agent_filter.triggers", "pipeline.mute_filter.listen_phrases"}
+            pattern_fields = {"pipeline.mute_filter.mute_triggers", "pipeline.mute_filter.listen_triggers", "pipeline.submit_filter.triggers"}
             if isinstance(current, list) and key in list_fields:
                 if value is not None and (not isinstance(value, list) or any(not isinstance(item, str) for item in value)):
                     raise ValueError(f"Expected a list of strings: {key}")
                 parsed = [item for item in value if item.strip()] if value is not None else None
-            elif isinstance(current, (dict, list)) or isinstance(value, list):
+            elif isinstance(current, dict) and key in pattern_fields:
+                if value is not None and (
+                    not isinstance(value, dict) or any(
+                        not isinstance(language, str) or not isinstance(patterns, list) or any(
+                            not isinstance(pattern, list) or any(not isinstance(word, str) for word in pattern)
+                            for pattern in patterns
+                        ) for language, patterns in value.items()
+                    )
+                ):
+                    raise ValueError(f"Expected language patterns: {key}")
+                parsed = value
+            elif isinstance(current, (dict, list)) or isinstance(value, (list, dict)):
                 raise KeyError(f"Unknown config key: {key}")
             else:
                 parsed = _parse_value(value, type(current) if current is not None else str) if value is not None else None
@@ -823,6 +836,14 @@ def set_config_values(
             if table is not None:
                 if value is None:
                     table.pop(field, None)
+                elif key in pattern_fields and isinstance(parsed, dict) and isinstance(table.get(field), dict):
+                    existing_patterns = table[field]
+                    for language in list(existing_patterns):
+                        if language not in parsed:
+                            del existing_patterns[language]
+                    for language, patterns in parsed.items():
+                        if language not in existing_patterns or existing_patterns[language] != patterns:
+                            existing_patterns[language] = patterns
                 else:
                     table[field] = parsed
             continue
@@ -832,8 +853,8 @@ def set_config_values(
             current = config_dict[parts[0]][parts[1]]
         else:
             raise KeyError(f"Unknown config key: {key}")
-        if isinstance(value, list):
-            raise ValueError(f"Unexpected list value: {key}")
+        if isinstance(value, (list, dict)):
+            raise ValueError(f"Unexpected structured value: {key}")
         parsed = _parse_value(value, type(current) if current is not None else str) if value is not None else None
         if len(parts) == 1:
             config_dict[key] = defaults[key] if value is None else parsed
