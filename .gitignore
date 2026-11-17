@@ -85,6 +85,8 @@ WORKFLOW.md
 docs/
 *.private.md
 private/
+feature-requests/
+.dictare-dev/
 
 scripts/dev/
 

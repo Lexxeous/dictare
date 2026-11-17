@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Development
+- Define one immediate feature branch per local request, complexity-ordered
+  implementation, validated checkpoint commits, and build/runner review.
+
 ## [0.7.0rc2] - 2026-08-01
 
 ### Changed

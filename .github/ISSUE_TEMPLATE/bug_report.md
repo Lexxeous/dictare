@@ -12,9 +12,9 @@ A clear and concise description of the bug.
 
 ## Steps to Reproduce
 
-1. Run `dictare listen`
-2. Do '...'
-3. See error
+1. Run the command or UI action that exposes the problem.
+2. Describe the inputs or actions.
+3. Describe what happens next.
 
 ## Expected Behavior
 
@@ -35,10 +35,10 @@ What actually happened.
 ## Logs
 
 <details>
-<summary>Output of `dictare check`</summary>
+<summary>Output of `dictare status`</summary>
 
 ```
-[paste output here]
+[paste output here, with private details removed]
 ```
 
 </details>
