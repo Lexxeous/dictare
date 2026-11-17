@@ -755,7 +755,7 @@ def _stamp_version(doc: Any) -> None:
 
     doc["_version"] = f"dictare/{__version__}"
 
-def set_config_values(updates: dict[str, str | None], config_path: Path | None = None) -> None:
+def set_config_values(updates: dict[str, str | list[str] | None], config_path: Path | None = None) -> None:
     """Validate form changes together, then replace one comment-preserving TOML file.
 
     None removes a key and restores its schema default. This transaction covers
@@ -795,9 +795,15 @@ def set_config_values(updates: dict[str, str | None], config_path: Path | None =
             if field not in current_group or field not in default_group:
                 raise KeyError(f"Unknown config key: {key}")
             current = current_group[field]
-            if isinstance(current, (dict, list)):
+            list_fields = {"pipeline.agent_filter.triggers", "pipeline.mute_filter.listen_phrases"}
+            if isinstance(current, list) and key in list_fields:
+                if value is not None and (not isinstance(value, list) or any(not isinstance(item, str) for item in value)):
+                    raise ValueError(f"Expected a list of strings: {key}")
+                parsed = [item for item in value if item.strip()] if value is not None else None
+            elif isinstance(current, (dict, list)) or isinstance(value, list):
                 raise KeyError(f"Unknown config key: {key}")
-            parsed = _parse_value(value, type(current) if current is not None else str) if value is not None else None
+            else:
+                parsed = _parse_value(value, type(current) if current is not None else str) if value is not None else None
             current_group[field] = default_group[field] if value is None else parsed
             table: Any = doc
             for part in parts[:-1]:
@@ -821,6 +827,8 @@ def set_config_values(updates: dict[str, str | None], config_path: Path | None =
             current = config_dict[parts[0]][parts[1]]
         else:
             raise KeyError(f"Unknown config key: {key}")
+        if isinstance(value, list):
+            raise ValueError(f"Unexpected list value: {key}")
         parsed = _parse_value(value, type(current) if current is not None else str) if value is not None else None
         if len(parts) == 1:
             config_dict[key] = defaults[key] if value is None else parsed

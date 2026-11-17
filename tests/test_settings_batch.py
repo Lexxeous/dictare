@@ -178,3 +178,23 @@ def test_agent_default_and_permissions_preserve_profiles(path):
     assert 'extra = "preserve"' in path.read_text()
     set_config_values({'agent_profiles.default': None}, path)
     assert load_config(path).agent_profiles.default is None
+
+
+def test_pipeline_string_lists_round_trip_without_rewriting_other_patterns(path):
+    path.write_text('[pipeline.agent_filter]\ntriggers = ["agent"] # keep\n[pipeline.mute_filter.mute_triggers]\nes = [["silencio"]]\n')
+    client = TestClient(OpenVIPServer(MockEngine(), MockController(), port=0)._app)
+    response = client.post('/api/settings', json={'values': {'pipeline.agent_filter.triggers': ['assistant', '', 'agent'], 'pipeline.mute_filter.listen_phrases': []}})
+    assert response.status_code == 200
+    config = load_config(path)
+    assert config.pipeline.agent_filter.triggers == ['assistant', 'agent']
+    assert config.pipeline.mute_filter.listen_phrases == []
+    assert config.pipeline.mute_filter.mute_triggers['es'] == [['silencio']]
+    assert '# keep' in path.read_text()
+
+
+def test_arbitrary_or_invalid_list_values_are_rejected_atomically(path):
+    client = TestClient(OpenVIPServer(MockEngine(), MockController(), port=0)._app)
+    original = path.read_bytes()
+    for values in ({'editor': ['bad']}, {'pipeline.agent_filter.triggers': [3]}, {'pipeline.mute_filter.mute_triggers': ['bad']}):
+        assert client.post('/api/settings', json={'values': values}).status_code in (400, 404)
+        assert path.read_bytes() == original

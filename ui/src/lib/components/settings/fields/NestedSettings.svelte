@@ -3,6 +3,7 @@
 	import { resolveFieldSchema } from "$lib/schema";
 	import FieldRenderer from "../FieldRenderer.svelte";
 	import TomlField from "./TomlField.svelte";
+	import * as settingsStore from "$lib/stores/settings.svelte";
 
 	type Group = "audio.advanced" | "stt.advanced" | "pipeline.mute_filter" | "pipeline.submit_filter" | "pipeline.agent_filter";
 	interface Props { section: Group; schema: JsonSchema }
@@ -57,6 +58,24 @@
 	{#each fields as field (field.key)}
 		<FieldRenderer {field} {schema} nestedForm />
 	{/each}
+	{#if section === "pipeline.agent_filter" || section === "pipeline.mute_filter"}
+		{@const listKey = section === "pipeline.agent_filter" ? "pipeline.agent_filter.triggers" : "pipeline.mute_filter.listen_phrases"}
+		<div class="px-4 py-3">
+			<label for={listKey} class="text-sm font-medium">
+				{section === "pipeline.agent_filter" ? "Assistant switch words" : "Spoken resume responses"}
+			</label>
+			<p class="text-xs text-muted-foreground mb-2">One phrase per line. Blank lines are ignored; leave empty to use no phrases.</p>
+			<textarea
+				id={listKey}
+				class="w-full min-h-24 rounded-md border bg-background px-3 py-2 text-sm"
+				value={((settingsStore.getValue(listKey) as string[] | null) ?? []).join("\n")}
+				oninput={(event) => {
+					const text = event.currentTarget.value;
+					settingsStore.markDirty(listKey, text === "" ? [] : text.split("\n"));
+				}}
+			></textarea>
+		</div>
+	{/if}
 	<div class="px-4 mt-2">
 		<TomlField {section} label="Advanced: edit configuration text" />
 	</div>

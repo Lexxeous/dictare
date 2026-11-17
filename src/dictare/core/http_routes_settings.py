@@ -358,10 +358,16 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
             raise HTTPException(status_code=400, detail="Expected a settings object")
         if "values" in body:
             values = body["values"]
-            if not isinstance(values, dict) or not values or any(not isinstance(key, str) or value is None or not isinstance(value, (str, bool, int, float)) for key, value in values.items()):
+            if not isinstance(values, dict) or not values or any(
+                not isinstance(key, str)
+                or value is None
+                or not (isinstance(value, (str, bool, int, float)) or
+                        (isinstance(value, list) and all(isinstance(item, str) for item in value)))
+                for key, value in values.items()
+            ):
                 raise HTTPException(status_code=400, detail="Expected a nonempty object of form values")
             try:
-                set_config_values({key: None if value == "" else str(value) for key, value in values.items()})
+                set_config_values({key: None if value == "" else value if isinstance(value, list) else str(value) for key, value in values.items()})
                 logger.info("settings.change keys=%s", sorted(values))
                 return {"status": "ok"}
             except KeyError as error:
