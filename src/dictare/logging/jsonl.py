@@ -265,7 +265,7 @@ class JSONLLogger:
         """Log a text injection.
 
         Text is included only if verbose=True in logger params.
-        Submit trigger info is always included (useful for debugging).
+        Spoken trigger content also requires verbose mode.
         """
         chars = len(text)
         extra: dict = {
@@ -279,10 +279,10 @@ class JSONLLogger:
         # Include text only in verbose mode
         if self._params.get("verbose"):
             extra["text"] = text
-        # Always include trigger info (useful for debugging false positives)
         if submit_trigger:
-            extra["submit_trigger"] = submit_trigger
             extra["submit_confidence"] = submit_confidence
+            if self._params.get("verbose"):
+                extra["submit_trigger"] = submit_trigger
         self._log_internal("injection", LogLevel.INFO, **extra)
 
     def log_vad_event(

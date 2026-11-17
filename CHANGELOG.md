@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guidance and explicit handling of unconfirmed shutdown requests.
 
 ### Fixed
+- Omit transcript previews and recognized command text from normal session and
+  engine logs; keep speech synthesis diagnostics to counts and request metadata.
 - Wrap the sidebar version label and remove its divider while collapsed. Add
   one-click copy controls to the bundled documentation's code blocks.
 - Make desktop navigation collapsible, widen settings content, move appearance

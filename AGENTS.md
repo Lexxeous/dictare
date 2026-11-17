@@ -46,6 +46,11 @@ boundaries. Keep those documents aligned with the implementation.
   identity through VAD/jobs/completions/timeouts and check it before side effects.
   Reset VAD before advancing capture generation; never acquire the delivery lock
   from a VAD callback holding the VAD lock. See ARCHITECTURE.md for ownership.
+- Keep transcript and recognized-command content out of ordinary operational
+  logs. Detailed text requires explicit verbose/debug diagnostics. Exercise
+  actual receive/delivery/logging paths in privacy tests rather than copying
+  redaction expressions into tests. Document persistent metadata, synthesis
+  caches and agent-owned history separately.
 - Do not add dependencies for a small local change. For substantial new
   functionality, review existing project code and maintained library options,
   then record any material adoption decision in the appropriate documentation.

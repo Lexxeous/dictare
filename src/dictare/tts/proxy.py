@@ -83,7 +83,7 @@ class WorkerTTSEngine(TTSEngine):
             msg,
         )
         if not delivered:
-            logger.warning("TTS worker not connected — speak(%r) dropped", text)
+            logger.warning("TTS worker not connected — speech dropped (id=%s)", message_id)
             with self._lock:
                 self._pending.pop(message_id, None)
             return False
@@ -94,7 +94,7 @@ class WorkerTTSEngine(TTSEngine):
             self._pending.pop(message_id, None)
 
         if not done.is_set():
-            logger.warning("TTS worker timed out for speak(%r)", text)
+            logger.warning("TTS worker timed out (id=%s)", message_id)
             return False
 
         return result["ok"]

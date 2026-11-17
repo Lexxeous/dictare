@@ -173,7 +173,7 @@ class TestLogEvent:
 
     def test_data_merged_into_entry(self, tmp_path: Path) -> None:
         p = tmp_path / "session.jsonl"
-        _log_event(p, "msg_read", {"seq": 3, "text": "hello"})
+        _log_event(p, "msg_read", {"seq": 3, "text": "hello"}, verbose=True)
         data = json.loads(p.read_text().strip())
         assert data["seq"] == 3
         assert data["text"] == "hello"
