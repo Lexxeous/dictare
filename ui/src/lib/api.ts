@@ -38,6 +38,14 @@ export async function saveSetting(
 	return r.json();
 }
 
+export class SettingsSaveError extends Error {
+	fieldErrors: Record<string, string>;
+	constructor(message: string, fieldErrors: Record<string, string> = {}) {
+		super(message);
+		this.fieldErrors = fieldErrors;
+	}
+}
+
 export type ProfileChanges = Record<string, Record<string, string | string[] | boolean | null>>;
 
 export async function saveSettings(values: Record<string, unknown>, profiles?: ProfileChanges, createProfiles: string[] = [], deleteProfiles: string[] = []): Promise<void> {
@@ -48,7 +56,7 @@ export async function saveSettings(values: Record<string, unknown>, profiles?: P
 	});
 	if (!response.ok) {
 		const data = await response.json();
-		throw new Error(data.detail || `Save failed: ${response.status}`);
+		throw new SettingsSaveError(data.detail || `Save failed: ${response.status}`, data.field_errors ?? {});
 	}
 }
 

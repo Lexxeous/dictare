@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, HTTPException, Request
-from starlette.responses import RedirectResponse
+from starlette.responses import JSONResponse, RedirectResponse
 from starlette.staticfiles import StaticFiles
 
 if TYPE_CHECKING:
@@ -392,11 +392,16 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
                 raise HTTPException(status_code=404, detail=str(error)) from error
             except ValidationError as error:
                 messages = []
+                field_errors: dict[str, str] = {}
                 for problem in error.errors(include_url=False, include_context=False, include_input=False):
                     field = " ".join(str(part).replace("_", " ") for part in problem["loc"])
+                    path = ".".join(str(part) for part in problem["loc"])
                     message = problem["msg"].removeprefix("Value error, ")
                     messages.append(f"{field}: {message}" if field else message)
-                raise HTTPException(status_code=400, detail="; ".join(messages)) from error
+                    for submitted in values:
+                        if path == submitted or path.startswith(submitted + "."):
+                            field_errors[submitted] = message
+                return JSONResponse(status_code=400, content={"detail": "; ".join(messages), "field_errors": field_errors})
             except ValueError as error:
                 raise HTTPException(status_code=400, detail=str(error)) from error
         key = body.get("key", "")

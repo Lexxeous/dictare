@@ -81,6 +81,9 @@
 					settingsStore.markDirty(listKey, text === "" ? [] : text.split("\n"));
 				}}
 			></textarea>
+			{#if settingsStore.getSaveErrors()[listKey]}
+				<p role="alert" class="text-xs text-destructive mt-1">{settingsStore.getSaveErrors()[listKey]}</p>
+			{/if}
 		</div>
 	{/if}
 	<div class="px-4 mt-2">

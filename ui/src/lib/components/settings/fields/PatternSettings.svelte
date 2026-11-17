@@ -55,4 +55,7 @@
 		<Button variant="outline" size="sm" onclick={addLanguage}>Add language</Button>
 	</div>
 	{#if error}<p role="alert" class="text-xs text-destructive mt-1">{error}</p>{/if}
+	{#if settingsStore.getSaveErrors()[settingKey]}
+		<p role="alert" class="text-xs text-destructive mt-1">{settingsStore.getSaveErrors()[settingKey]}</p>
+	{/if}
 </div>

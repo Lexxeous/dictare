@@ -301,3 +301,12 @@ def test_removing_current_default_or_unknown_profile_rejects_whole_batch(path):
         response = client.post('/api/settings', json={'values': {'editor': 'new'}, 'delete_profiles': [name]})
         assert response.status_code in (400, 404)
         assert path.read_bytes() == original
+
+
+def test_validation_returns_safe_error_for_the_affected_form_field(path):
+    client = TestClient(OpenVIPServer(MockEngine(), MockController(), port=0)._app)
+    response = client.post('/api/settings', json={'values': {'audio.sounds.start.volume': 2}})
+    assert response.status_code == 400
+    body = response.json()
+    assert 'audio.sounds.start.volume' in body['field_errors']
+    assert '2' not in body['field_errors']['audio.sounds.start.volume']

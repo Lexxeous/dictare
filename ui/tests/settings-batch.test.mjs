@@ -42,3 +42,12 @@ test("profile removal and changing default use one settings request", async (t) 
 	});
 	await saveSettings({ "agent_profiles.default": "other" }, {}, [], ["old.agent"]);
 });
+
+test("batch validation exposes errors for the associated control", async (t) => {
+	t.mock.method(globalThis, "fetch", async () => Response.json({ detail: "Invalid volume", field_errors: { "audio.sounds.start.volume": "Must be at most 1" } }, { status: 400 }));
+	await assert.rejects(() => saveSettings({ "audio.sounds.start.volume": 2 }), (error) => {
+		assert.equal(error.message, "Invalid volume");
+		assert.equal(error.fieldErrors["audio.sounds.start.volume"], "Must be at most 1");
+		return true;
+	});
+});

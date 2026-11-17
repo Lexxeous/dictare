@@ -1,5 +1,5 @@
 import { conflictingSections } from "$lib/settings-conflicts";
-import { fetchSchema, saveSettings, saveTomlSection, saveShortcuts, selectCapability, restartEngine, type Shortcut, type StatusResponse, type ProfileChanges } from "$lib/api";
+import { SettingsSaveError, fetchSchema, saveSettings, saveTomlSection, saveShortcuts, selectCapability, restartEngine, type Shortcut, type StatusResponse, type ProfileChanges } from "$lib/api";
 import type { SchemaResponse } from "$lib/types";
 
 let schema = $state<SchemaResponse | null>(null);
@@ -267,6 +267,7 @@ export async function saveAll(): Promise<void> {
 			await saveSettings(dirty, dirtyProfiles, createdProfiles, deletedProfiles);
 		} catch (e) {
 			errors.settings = (e as Error).message;
+			if (e instanceof SettingsSaveError) Object.assign(errors, e.fieldErrors);
 			errorCount++;
 		}
 	}
