@@ -1,0 +1,3 @@
+name = "source-process-lifecycle"
+bump = "none"
+summary = "Honor settings restarts and stop owned source process groups cleanly."

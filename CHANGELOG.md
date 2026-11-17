@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   selected Codex session instead of attempting to execute a resume binary.
 
 ### Development
+- Restart the isolated source engine after settings changes and terminate only
+  the engine/UI process groups owned by the source runner on Ctrl+C.
 - Validate related settings form edits together before replacing the TOML file;
   allow isolated worktrees to select a compatible contributor Python environment.
 - Add isolated source development with checkout-local state, alternate ports,
