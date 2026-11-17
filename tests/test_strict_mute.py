@@ -179,3 +179,15 @@ def test_hotkey_resume_keeps_listening_after_next_transcription():
     engine._state_manager.transition(AppState.TRANSCRIBING, force=True)
     engine._controller._handle_event(TranscriptionCompleted(text="", capture_generation=engine._capture_generation))
     assert engine.state == AppState.LISTENING
+
+
+def test_restored_strict_mute_starts_without_opening_input():
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine._strict_muted = True
+    engine.audio_manager = MagicMock()
+    engine._controller = MagicMock()
+    engine._notify_status = MagicMock()
+    engine.start_runtime(start_listening=True)
+    assert engine.state == AppState.OFF
+    assert engine.audio_manager.start_streaming.call_args.kwargs["suspended"] is True
+    assert not engine.audio_manager.start_streaming.call_args.kwargs["should_process"]()
