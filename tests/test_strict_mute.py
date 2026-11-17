@@ -17,6 +17,7 @@ def test_strict_gate_rejects_stale_audio_and_requires_hotkey(monkeypatch):
     engine._state_manager.transition(AppState.LISTENING, force=True)
     previous = engine._capture_generation
     engine.strict_mute()
+    engine.audio_manager.suspend_input.assert_called_once()
     engine._on_vad_speech_start()
     engine._on_vad_speech_end(np.zeros(100))
     assert not engine.capture_allowed(previous)
@@ -28,6 +29,7 @@ def test_strict_gate_rejects_stale_audio_and_requires_hotkey(monkeypatch):
     engine._controller._handle_event(HotkeyPressed(source="hotkey"))
     engine._controller._handle_event(engine._controller._queue.get_nowait())
     assert engine.state == AppState.LISTENING
+    engine.audio_manager.resume_input.assert_called_once()
     assert not engine.capture_allowed(previous)
     assert engine.capture_allowed()
     engine.inject_text = MagicMock()
@@ -81,3 +83,18 @@ def test_native_transcription_finishing_after_strict_mute_is_discarded(monkeypat
     assert engine._last_text == ""
     assert engine.stats.count == 0
     engine._logger.log_transcription.assert_not_called()
+
+
+def test_failed_input_reopen_keeps_strict_gate_closed(monkeypatch):
+    monkeypatch.setattr("dictare.audio.beep.stop_loop", lambda: None)
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine.audio_manager = MagicMock()
+    engine.audio_manager.resume_input.side_effect = RuntimeError("input unavailable")
+    engine.tts_mgr = MagicMock()
+    engine.strict_mute()
+    engine._controller._handle_event(engine._controller._queue.get_nowait())
+    engine._controller._handle_event(HotkeyPressed(source="hotkey"))
+    assert engine._strict_muted
+    assert not engine.capture_allowed()
+    assert engine.state == AppState.OFF
+    assert engine._controller._queue.empty()

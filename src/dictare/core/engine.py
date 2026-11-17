@@ -219,6 +219,7 @@ class DictareEngine:
         self._voice_muted = False
         # Separate from standard voice mute; not yet exposed in the UI.
         self._strict_muted = False
+        self._strict_mute_transition_lock = threading.Lock()
         self._capture_generation = 0  # Independent of hung-worker recovery.
 
         # Guard against concurrent audio reconnect attempts
@@ -1311,32 +1312,57 @@ class DictareEngine:
         self._notify_status()
 
     def strict_mute(self) -> None:
-        """Immediately gate capture; the physical hotkey is needed to resume.
+        """Gate capture and close input; the physical hotkey resumes it.
 
         Kept internal until queued audio and TTS cancellation are implemented.
         """
         from dictare.audio.beep import stop_loop
 
-        with self._injection_lock:
-            if self._strict_muted:
-                return
-            self._strict_muted = True
-            self.discard_current_internal()
-            self._controller.send(StrictMuted(source="strict_mute"))
-        stop_loop()
-        self.tts_mgr.stop_speaking()
-        self._notify_status()
+        with self._strict_mute_transition_lock:
+            with self._injection_lock:
+                if self._strict_muted:
+                    return
+                self._strict_muted = True
+                self.discard_current_internal()
+                self._controller.send(StrictMuted(source="strict_mute"))
+            # Native lifecycle operations run on the audio owner, not the VAD
+            # callback thread. The processing gate remains closed on failure.
+            if self.audio_manager:
+                try:
+                    self.audio_manager.suspend_input()
+                except Exception:
+                    logger.exception("Could not close strict-muted input")
+            stop_loop()
+            try:
+                self.tts_mgr.stop_speaking()
+            except Exception:
+                logger.exception("Could not stop speech playback")
+            self._notify_status()
 
     def resume_strict_mute(self) -> None:
         """Resume the strict gate only through the controller's hotkey path."""
-        with self._injection_lock:
-            if not self._strict_muted or self.review_pending():
+        with self._strict_mute_transition_lock:
+            with self._injection_lock:
+                if not self._strict_muted or self.review_pending():
+                    return
+            if self.audio_manager:
+                try:
+                    self.audio_manager.resume_input()
+                except Exception:
+                    logger.exception("Could not reopen strict-muted input")
+                    return
+            with self._injection_lock:
+                pending = self.review_pending()
+                if not pending:
+                    self.discard_current_internal()
+                    self._strict_muted = False
+                    self._voice_muted = False
+                    self._controller.send(SetListening(on=True, source="strict_resume"))
+            if pending:
+                if self.audio_manager:
+                    self.audio_manager.suspend_input()
                 return
-            self.discard_current_internal()
-            self._strict_muted = False
-            self._voice_muted = False
-            self._controller.send(SetListening(on=True, source="strict_resume"))
-        self._notify_status()
+            self._notify_status()
 
     def unmute(self) -> None:
         """Unmute voice input (idempotent).
@@ -1730,6 +1756,7 @@ class DictareEngine:
             self.audio_manager.start_streaming(
                 should_process=self._should_process_capture,
                 is_running=lambda: self.running,
+                suspended=self._strict_muted,
             )
         _audio_ms = (time.monotonic() - _t0) * 1000
         if _audio_ms > 500:
