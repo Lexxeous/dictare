@@ -387,11 +387,18 @@ class StateController:
         if self._engine:
             self._engine.discard_current_internal()
 
+    def _review_pending(self) -> bool:
+        """Do not restart capture while a prompt awaits a decision."""
+        check = getattr(self._engine, "review_pending", None)
+        return callable(check) and check() is True
+
     def _handle_hotkey_toggle(self, event: HotkeyPressed) -> None:
         """User wants to toggle listening."""
         current = self._state_manager.state
 
         if current == AppState.OFF:
+            if self._review_pending():
+                return
             # OFF → LISTENING
             if self._state_manager.try_transition(AppState.LISTENING):
                 if self._on_state_change:
@@ -441,6 +448,8 @@ class StateController:
         current = self._state_manager.state
 
         if event.on and current == AppState.OFF:
+            if self._review_pending():
+                return
             if self._state_manager.try_transition(AppState.LISTENING):
                 if self._on_state_change:
                     self._on_state_change(AppState.OFF, AppState.LISTENING, "set_listening")

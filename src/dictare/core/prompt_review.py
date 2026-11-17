@@ -16,6 +16,16 @@ from uuid import uuid4
 from dictare.agent.base import Agent
 
 
+class UnavailableReviewAgent:
+    """Retain a draft safely when its original target cannot be bound."""
+
+    def __init__(self, agent_id: str) -> None:
+        self.id = agent_id
+
+    def send(self, message: dict[str, Any]) -> bool:
+        return False
+
+
 @dataclass(frozen=True)
 class ReviewSnapshot:
     """Displayable copy of a draft; never expose the live delivery object."""
@@ -58,6 +68,11 @@ class ReviewSlot:
             self._agent = agent
             self._messages = copied_messages
             return self._snapshot()
+
+    def occupied(self) -> bool:
+        """Check for a draft without copying its contents."""
+        with self._lock:
+            return self._id is not None
 
     def snapshot(self) -> ReviewSnapshot | None:
         with self._lock:

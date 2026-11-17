@@ -28,7 +28,7 @@ from dictare.core.fsm import (
     TranscriptionCompleted,
 )
 from dictare.core.openvip_messages import create_message
-from dictare.core.prompt_review import ReviewSlot, ReviewSnapshot
+from dictare.core.prompt_review import ReviewSlot, ReviewSnapshot, UnavailableReviewAgent
 from dictare.core.status_report import build_status, check_launcher_hash
 from dictare.core.tts_manager import TTSManager
 from dictare.hotkey.base import HotkeyListener
@@ -192,6 +192,8 @@ class DictareEngine:
         self.requested_exit_reason = "normal"
         self._injection_lock = threading.RLock()  # Serialize capture cancellation and delivery.
         self._review_slot = ReviewSlot()
+        # Internal until capture, UI and settings are validated together.
+        self._review_enabled = False
         self._logger = logger
 
         # Pipelines for message processing
@@ -694,7 +696,9 @@ class DictareEngine:
 
     def capture_allowed(self, capture_generation: int | None = None) -> bool:
         """Whether work belongs to the current capture lifetime, not an old discard."""
-        return capture_generation is None or capture_generation == self._capture_generation
+        return not self.review_pending() and (
+            capture_generation is None or capture_generation == self._capture_generation
+        )
 
     def transcribe_and_process(self, audio_data: Any, agent: Agent | None = None, capture_generation: int | None = None) -> None:
         """Queue audio for transcription on the dedicated STT worker.
@@ -1011,6 +1015,20 @@ class DictareEngine:
         if agent is None:
             target_agent = self._get_current_agent()
 
+        # Review is internal until the UI and configuration are ready. An
+        # unbound target is retained but cannot be sent or silently retargeted.
+        if self._review_enabled and messages_to_send:
+            from dictare.agent.sse import SSEAgent
+
+            review_target: Agent = (
+                target_agent.bind_for_review() if isinstance(target_agent, SSEAgent)
+                else UnavailableReviewAgent(target_agent.id if target_agent else "No assistant connected")
+            )
+            if self._review_slot.hold(review_target, messages_to_send):
+                self.discard_current_internal()
+                self.set_listening(False)
+            return
+
         # Lock to prevent concurrent injections
         with self._injection_lock:
             inject_start = time.time()
@@ -1065,12 +1083,18 @@ class DictareEngine:
                 inject_ms=inject_elapsed * 1000,
             )
 
+    def review_pending(self) -> bool:
+        """Whether a prompt is awaiting review or currently being sent."""
+        return self._review_slot.occupied()
+
     def review_snapshot(self) -> ReviewSnapshot | None:
         """Return an in-memory review draft, if one has been captured."""
         return self._review_slot.snapshot()
 
     def discard_review(self, draft_id: str) -> bool:
         """Discard a matching draft without restarting listening."""
+        if self._state_manager.state != AppState.OFF:
+            return False
         return self._review_slot.discard(draft_id)
 
     def send_review(self, draft_id: str) -> str:
@@ -1080,6 +1104,8 @@ class DictareEngine:
         transport call is not a remote acknowledgement. Delivery is never
         retried automatically; unsent messages remain in the slot.
         """
+        if self._state_manager.state != AppState.OFF:
+            return "unavailable"
         claim = self._review_slot.claim(draft_id)
         if claim is None:
             return "unavailable"
@@ -1175,6 +1201,8 @@ class DictareEngine:
         If truly idle (LISTENING, no speech), sends an immediate empty
         submit message.
         """
+        if self.review_pending():
+            return
         state = self._state_manager.state
         vad_speaking = (
             self.audio_manager is not None
