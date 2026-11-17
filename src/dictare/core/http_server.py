@@ -24,6 +24,7 @@ from fastapi import FastAPI, Request
 from dictare import __version__
 from dictare.core.http_routes_models import register_models_routes
 from dictare.core.http_routes_openvip import register_openvip_routes
+from dictare.core.http_routes_review import register_review_routes
 from dictare.core.http_routes_settings import register_settings_routes
 
 if TYPE_CHECKING:
@@ -150,6 +151,7 @@ class OpenVIPServer:
             redoc_url=None,
         )
         register_openvip_routes(app, self)
+        register_review_routes(app, self)
         register_settings_routes(app, self)
         register_models_routes(app, self)
         return app

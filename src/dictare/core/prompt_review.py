@@ -34,6 +34,7 @@ class ReviewSnapshot:
     destination: str
     messages: list[dict[str, Any]] = field(repr=False)
     sending: bool = False
+    can_send: bool = True
 
 
 @dataclass(frozen=True)
@@ -81,7 +82,10 @@ class ReviewSlot:
     def _snapshot(self) -> ReviewSnapshot | None:
         if self._id is None or self._agent is None:
             return None
-        return ReviewSnapshot(self._id, self._agent.id, deepcopy(self._messages), self._claim is not None)
+        return ReviewSnapshot(
+            self._id, self._agent.id, deepcopy(self._messages),
+            self._claim is not None, not isinstance(self._agent, UnavailableReviewAgent),
+        )
 
     def claim(self, draft_id: str) -> ReviewClaim | None:
         """Claim a matching draft once; competing operations cannot replace it."""
