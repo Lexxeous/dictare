@@ -283,6 +283,7 @@ class HoldCaptureEnded(StateMessage):
 
     cancelled: bool = False
     capture_generation: int | None = None
+    hold_generation: int | None = None
 
 @dataclass(frozen=True)
 class StrictMuted(StateMessage):

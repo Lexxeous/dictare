@@ -95,6 +95,7 @@ class StateController:
 
         # Pending transcription during TTS
         self._pending_transcription: TranscriptionCompleted | None = None
+        self._pending_hold_generation: int | None = None
 
         # Transcription watchdog timer
         self._transcription_watchdog: threading.Timer | None = None
@@ -161,6 +162,8 @@ class StateController:
         """Handle a single event. Called sequentially, never concurrently."""
         if isinstance(event, (SpeechStarted, SpeechEnded, TranscriptionCompleted, HoldCaptureEnded)):
             if self._engine and not self._engine.capture_allowed(event.capture_generation):
+                if isinstance(event, HoldCaptureEnded):
+                    self._acknowledge_hold(event.hold_generation)
                 return
         if isinstance(event, SpeechStarted):
             self._handle_speech_start(event)
@@ -183,6 +186,7 @@ class StateController:
         elif isinstance(event, StrictMuted):
             self._cancel_transcription_watchdog()
             self._pending_transcription = None
+            self._finish_hold_turn()
             self._desired_state_after_play = AppState.OFF
             old = self._state_manager.state
             self._state_manager.transition(AppState.OFF, force=True)
@@ -245,6 +249,7 @@ class StateController:
                 self._on_state_change(AppState.TRANSCRIBING, target_state, "audio_too_short")
             if target_state == AppState.OFF:
                 self._discard_capture()
+                self._finish_hold_turn()
             return
 
         # Start transcription (with captured agent)
@@ -308,6 +313,7 @@ class StateController:
 
         if target_state == AppState.OFF:
             self._discard_capture()
+            self._finish_hold_turn()
 
         # Process queued audio only when going back to LISTENING
         if target_state == AppState.LISTENING and self._engine:
@@ -393,6 +399,7 @@ class StateController:
             self._engine.process_queued_audio()
         elif target_state == AppState.OFF:
             self._discard_capture()
+            self._finish_hold_turn()
 
     def _discard_capture(self) -> None:
         """Invalidate work and its watchdog together on the controller owner."""
@@ -400,6 +407,16 @@ class StateController:
         self._pending_transcription = None
         if self._engine:
             self._engine.discard_current_internal()
+
+    def _acknowledge_hold(self, generation: int | None) -> None:
+        """Release only the matching physical gesture after its turn drains."""
+        callback = getattr(self._engine, "complete_hold", None)
+        if generation is not None and callable(callback):
+            callback(generation)
+
+    def _finish_hold_turn(self) -> None:
+        generation, self._pending_hold_generation = self._pending_hold_generation, None
+        self._acknowledge_hold(generation)
 
     def _review_pending(self) -> bool:
         """Do not restart capture while a prompt awaits a decision."""
@@ -431,6 +448,7 @@ class StateController:
             if self._state_manager.try_transition(AppState.OFF):
                 # Clear buffered audio
                 self._discard_capture()
+                self._finish_hold_turn()
                 if self._on_state_change:
                     self._on_state_change(previous, AppState.OFF, "hotkey_toggle")
 
@@ -479,6 +497,7 @@ class StateController:
             if current == AppState.LISTENING:
                 if self._state_manager.try_transition(AppState.OFF):
                     self._discard_capture()
+                    self._finish_hold_turn()
                     if self._on_state_change:
                         self._on_state_change(AppState.LISTENING, AppState.OFF, "set_listening")
             elif current in (AppState.RECORDING, AppState.TRANSCRIBING, AppState.INJECTING):
@@ -496,15 +515,18 @@ class StateController:
         that segment completes, rather than invalidating it before delivery.
         """
         current = self._state_manager.state
+        self._pending_hold_generation = event.hold_generation
         if event.cancelled:
             self._desired_state_after_play = AppState.OFF if self.play_in_progress else AppState.LISTENING
             self._discard_capture()
+            self._finish_hold_turn()
             if current != AppState.OFF:
                 self._state_manager.transition(AppState.OFF, force=True)
                 if self._on_state_change:
                     self._on_state_change(current, AppState.OFF, "hold_cancelled")
             return
         if current == AppState.OFF:
+            self._finish_hold_turn()
             return
         self._desired_state_after_play = AppState.OFF
         if current in (AppState.TRANSCRIBING, AppState.INJECTING, AppState.PLAYING):
@@ -514,12 +536,14 @@ class StateController:
             self._desired_state_after_play = AppState.LISTENING
             self._state_manager.transition(AppState.OFF, force=True)
             self._discard_capture()
+            self._finish_hold_turn()
             if self._on_state_change:
                 self._on_state_change(current, AppState.OFF, "hold_empty")
 
     def _handle_discard_current(self, event: DiscardCurrent) -> None:
         """User wants to discard current recording."""
         self._discard_capture()
+        self._finish_hold_turn()
 
         if self._state_manager.state in (AppState.RECORDING, AppState.TRANSCRIBING, AppState.INJECTING) and not self.play_in_progress:
             old_state = self._state_manager.state
