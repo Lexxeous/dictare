@@ -167,3 +167,15 @@ def test_strict_command_requires_a_hotkey_or_source_test_mode(monkeypatch):
     assert engine._review_slot.discard(draft.id)
     assert engine.handle_protocol_command({"command": "stt.strict_mute"})["status"] == "ok"
     engine.strict_mute.assert_called_once()
+
+
+def test_hotkey_resume_keeps_listening_after_next_transcription():
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine.tts_mgr = MagicMock()
+    assert engine.strict_mute()
+    engine._controller._handle_event(engine._controller._queue.get_nowait())
+    engine._controller._handle_event(HotkeyPressed(source="hotkey"))
+    engine._controller._handle_event(engine._controller._queue.get_nowait())
+    engine._state_manager.transition(AppState.TRANSCRIBING, force=True)
+    engine._controller._handle_event(TranscriptionCompleted(text="", capture_generation=engine._capture_generation))
+    assert engine.state == AppState.LISTENING

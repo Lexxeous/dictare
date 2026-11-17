@@ -467,6 +467,7 @@ class StateController:
             if self._review_pending():
                 return
             if self._state_manager.try_transition(AppState.LISTENING):
+                self._desired_state_after_play = AppState.LISTENING
                 if self._on_state_change:
                     self._on_state_change(AppState.OFF, AppState.LISTENING, "set_listening")
         elif not event.on:
