@@ -1018,7 +1018,7 @@ class DictareEngine:
 
         # Review is internal until the UI and configuration are ready. An
         # unbound target is retained but cannot be sent or silently retargeted.
-        if self._review_enabled and messages_to_send:
+        if self._review_enabled and any(str(msg.get("text") or "").strip() for msg in messages_to_send):
             from dictare.agent.sse import SSEAgent
 
             review_target: Agent = (

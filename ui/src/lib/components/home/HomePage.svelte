@@ -5,10 +5,12 @@
 	import { fetchStatus, type StatusResponse } from "$lib/api";
 	import { hotkeyLabel, listeningLabel, setListening } from "$lib/listening";
 	import { getSchema } from "$lib/stores/settings.svelte";
+	import ReviewPanel from "./ReviewPanel.svelte";
 
 	let status = $state<StatusResponse | null>(null);
 	let error = $state("");
 	let pending = $state(false);
+	let reviewPending = $state(false);
 	let waitingFor: boolean | null = $state(null);
 	let waitStarted = 0;
 	const active = $derived(status?.stt.active ?? false);
@@ -67,7 +69,7 @@
 	<div class="rounded-lg border p-5 space-y-4">
 		<p role="status" class="text-lg">{loading ? "Getting ready…" : status ? listeningLabel(status.platform.state) : "Connecting to Dictare…"}</p>
 		<p class="text-sm text-muted-foreground">Speak naturally, then pause to let Dictare write your words.</p>
-		<Button size="lg" class="w-full sm:w-auto h-auto min-h-11 whitespace-normal" onclick={toggleListening} disabled={!status || loading || pending || waitingFor !== null}>
+		<Button size="lg" class="w-full sm:w-auto h-auto min-h-11 whitespace-normal" onclick={toggleListening} disabled={!status || loading || pending || waitingFor !== null || reviewPending}>
 			{#if active}<MicOff />{:else}<Mic />{/if}
 			{pending ? "Requesting change…" : waitingFor !== null ? "Waiting for listening to change…" : active ? "Stop listening" : "Start listening"}
 		</Button>
@@ -77,6 +79,7 @@
 		{/if}
 		{#if error}<p role="alert" class="text-sm text-destructive">{error}</p>{/if}
 	</div>
+	<ReviewPanel ready={status?.platform.state === "off"} onPendingChange={(value) => reviewPending = value} />
 	<div class="rounded-lg border p-5 space-y-2 break-words">
 		<h3 class="font-medium">Where your words go</h3>
 		{#if status?.platform.output.mode === "keyboard"}

@@ -72,3 +72,17 @@ def test_capture_after_protocol_exit_request_is_not_delivered():
     engine.inject_text("late result", agent=target)
     target.send.assert_not_called()
     assert engine.review_snapshot() is None
+
+
+def test_submit_only_command_does_not_create_a_review_draft():
+    engine = DictareEngine(Config(), hotkey_enabled=False)
+    engine._review_enabled = True
+    target = Mock()
+    target.id = "codex"
+    target.send.return_value = True
+    engine._pipeline = Mock()
+    engine._pipeline.process.return_value = [{"text": "", "x_input": {"ops": ["submit"]}}]
+    engine._executor_pipeline = None
+    engine.inject_text("send command", agent=target)
+    assert engine.review_snapshot() is None
+    target.send.assert_called_once()
