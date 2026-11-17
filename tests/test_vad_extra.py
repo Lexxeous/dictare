@@ -222,6 +222,19 @@ class TestStreamingVAD:
         assert len(speech_ends) == 1
         assert sv._is_speaking is False
 
+    def test_explicit_flush_mode_keeps_speech_across_silence(self) -> None:
+        vad = _MockVAD()
+        ends = []
+        sv = StreamingVAD(vad, on_speech_start=lambda: None, on_speech_end=ends.append, end_on_silence=False)
+        vad.set_probs([0.8] * 10 + [0.1] * 30 + [0.8] * 10)
+        for _ in range(50):
+            sv.process_chunk(self._chunk())
+        assert sv._is_speaking
+        assert not ends
+        sv.flush()
+        assert len(ends) == 1
+        assert not sv._is_speaking
+
     def test_flush(self) -> None:
         """Flush sends accumulated audio when speaking."""
         vad = _MockVAD()

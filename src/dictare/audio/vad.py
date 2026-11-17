@@ -231,6 +231,7 @@ class StreamingVAD:
         on_partial_audio: Callable[[NDArray[np.float32]], None] | None = None,
         partial_interval_ms: int = 1000,
         pre_buffer_ms: int = 640,
+        end_on_silence: bool = True,
     ) -> None:
         """Initialize streaming VAD.
 
@@ -243,6 +244,7 @@ class StreamingVAD:
             on_partial_audio: Called periodically with accumulated audio (for realtime feedback).
             partial_interval_ms: Interval between partial audio callbacks (default 1000ms).
             pre_buffer_ms: Pre-buffer duration in ms to capture audio before speech (default 640ms).
+            end_on_silence: Finish a speech segment on silence; explicit flush still works when false.
         """
         self.vad = vad
         self.on_speech_start = on_speech_start
@@ -250,6 +252,7 @@ class StreamingVAD:
         self.max_speech_samples = max_speech_seconds * vad.sample_rate
         self.on_max_speech = on_max_speech
         self.on_partial_audio = on_partial_audio
+        self.end_on_silence = end_on_silence
         self._partial_interval_samples = partial_interval_ms * vad.sample_rate // 1000
 
         # State
@@ -342,7 +345,7 @@ class StreamingVAD:
 
                 # Check if silence is long enough to end speech
                 min_silence = self.vad.sample_rate * self.vad.min_silence_ms // 1000
-                if self._silence_samples >= min_silence:
+                if self.end_on_silence and self._silence_samples >= min_silence:
                     self._is_speaking = False
                     self._silence_samples = 0
                     self._total_speech_samples = 0
