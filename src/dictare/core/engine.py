@@ -1061,10 +1061,11 @@ class DictareEngine:
         # Review is internal until the UI and configuration are ready. An
         # unbound target is retained but cannot be sent or silently retargeted.
         if self._review_enabled and any(str(msg.get("text") or "").strip() for msg in messages_to_send):
+            from dictare.agent.managed_session import ManagedSessionAgent
             from dictare.agent.sse import SSEAgent
 
             review_target: Agent = (
-                target_agent.bind_for_review() if isinstance(target_agent, SSEAgent)
+                target_agent.bind_for_review() if isinstance(target_agent, (SSEAgent, ManagedSessionAgent))
                 else UnavailableReviewAgent(target_agent.id if target_agent else "No assistant connected")
             )
             if self._review_slot.hold(review_target, messages_to_send):
@@ -1552,10 +1553,10 @@ class DictareEngine:
         """Register an agent."""
         return self._agent_mgr.register(agent)
 
-    def unregister_agent(self, agent_id: str) -> bool:
+    def unregister_agent(self, agent_id: str, *, fallback: bool = True) -> bool:
         """Unregister an agent by ID."""
         self._feedback_policy.remove_agent(agent_id)
-        return self._agent_mgr.unregister(agent_id)
+        return self._agent_mgr.unregister(agent_id, fallback=fallback)
 
     def set_agent_focus(self, agent_id: str, focused: bool) -> None:
         """Update focus state for an agent's terminal."""

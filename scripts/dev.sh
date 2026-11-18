@@ -15,7 +15,7 @@ usage() {
 Run Dictare directly from this checkout, separate from an installed release.
 
 Usage: ./scripts/dev.sh
-  setup [--mlx]       Install the local Python and UI environments
+  setup [--mlx] [--codex] Install the local Python and UI environments
   run [DICTARE_ARGS…] Run the local Dictare CLI
   serve [ARGS…]       Run the local engine on port 18770
   ui                  Run the local settings UI on port 5173
@@ -32,6 +32,7 @@ Usage: ./scripts/dev.sh
 
 Optional setup flag:
   --mlx                                  Include the Apple Silicon MLX extra
+  --codex                                Include managed Codex session support
 
 The source runner uses this checkout's .venv and .dictare-dev/ state. It does
 not invoke the `dictare` executable from PATH or manage installed services.
@@ -172,19 +173,18 @@ case "$command_name" in
         usage
         ;;
     setup)
-        mlx_flag=""
-        if [[ "${1:-}" == "--mlx" ]]; then
-            mlx_flag="--extra mlx"
+        extras=(--extra dev)
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --mlx) extras+=(--extra mlx) ;;
+                --codex) extras+=(--extra codex) ;;
+                *) error "Unexpected setup argument: $1" ;;
+            esac
             shift
-        fi
-        [[ $# -eq 0 ]] || error "Unexpected setup argument: $1"
+        done
         command -v uv >/dev/null 2>&1 || error "Install uv before setting up the local Python environment."
         command -v npm >/dev/null 2>&1 || error "Install Node.js and npm before setting up the local settings UI."
-        if [[ "$mlx_flag" == "--extra mlx" ]]; then
-            (cd "$ROOT_DIR" && uv sync --locked --python 3.11 --extra dev --extra mlx)
-        else
-            (cd "$ROOT_DIR" && uv sync --locked --python 3.11 --extra dev)
-        fi
+        (cd "$ROOT_DIR" && uv sync --locked --python 3.11 "${extras[@]}")
         (cd "$ROOT_DIR/ui" && npx --yes pnpm@10.34.9 install --frozen-lockfile)
         printf '\nLocal source environment is ready. Run ./scripts/dev.sh stack.\n'
         ;;

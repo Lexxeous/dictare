@@ -112,6 +112,21 @@ To discover options, run `dictare --help`. Command groups have their own
 help: `dictare service --help` lists commands such as `stop`, and
 `dictare agent --help` lists agent options.
 
+### Managed Codex sessions
+
+To dictate directly to a Codex session managed by Dictare, install the optional
+`codex` extra (for a source checkout, run `./scripts/dev.sh setup --codex`,
+adding `--mlx` if needed). Sign in to Codex separately, then open **Dashboard →
+Managed Codex sessions**, enter an absolute working folder, and start a session.
+You can instead resume saved history by providing its session ID. Resuming starts
+a separate managed connection; it does not attach to an existing terminal.
+Select the target before dictating when more than one agent is available. The
+panel shows Codex responses and preserves an unconfirmed draft for copying;
+it never automatically retries an uncertain submission. Codex can write within
+the working folder, and approval requests are declined. OpenVIP agents continue
+to work as before. Managed sessions end when Dictare stops; Codex owns its own
+stored session history.
+
 ## How It Works
 
 ```

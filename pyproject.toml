@@ -61,6 +61,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+codex = [
+    "openai-codex==0.169.1",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.0.0",

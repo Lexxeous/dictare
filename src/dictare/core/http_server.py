@@ -25,6 +25,7 @@ from fastapi import FastAPI, Request
 from dictare import __version__
 from dictare.core.http_routes_models import register_models_routes
 from dictare.core.http_routes_openvip import register_openvip_routes
+from dictare.core.http_routes_provider import ProviderSessions, register_provider_routes
 from dictare.core.http_routes_review import register_review_routes
 from dictare.core.http_routes_settings import register_settings_routes
 
@@ -124,6 +125,8 @@ class OpenVIPServer:
         self._started = threading.Event()
         self._start_error: Exception | None = None  # Set if server failed to start
 
+        self.provider_sessions = ProviderSessions(self)
+
         # FastAPI app
         self._app = self._create_app()
 
@@ -153,6 +156,7 @@ class OpenVIPServer:
         )
         register_openvip_routes(app, self)
         register_review_routes(app, self)
+        register_provider_routes(app, self)
         if os.environ.get("DICTARE_DEV_MODE") == "1":
             from dictare.core.http_routes_development import register_development_routes
 
@@ -457,6 +461,7 @@ class OpenVIPServer:
             self._start_error = e
         finally:
             self._started.set()  # Ensure event fires even on error
+            self.provider_sessions.close()
             self._loop.close()
             self._loop = None
 

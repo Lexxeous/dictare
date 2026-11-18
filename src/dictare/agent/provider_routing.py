@@ -87,7 +87,7 @@ class ProviderRouter:
                 # Do not log provider exceptions: they can contain prompt text.
                 failures.append(provider_id)
         available = {session.key: session.connection_id for session in sessions}
-        if available.get(self._selected) != self._connection_id:
+        if self._selected is not None and available.get(self._selected) != self._connection_id:
             self._selected = None
             self._connection_id = None
         # A failed provider may have other targets, so do not auto-select.
@@ -146,4 +146,4 @@ class ProviderRouter:
             await self._providers[target.provider].send(target, prompt)
         except Exception:
             # Provider exceptions may include the prompt, including in tracebacks.
-            raise RoutingError("Provider could not accept the prompt") from None
+            raise RoutingError("Provider delivery failed or could not be confirmed") from None

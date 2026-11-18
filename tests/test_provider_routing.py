@@ -131,7 +131,7 @@ def test_invalid_provider_results_and_send_errors_fail_closed():
         provider.available = [session("codex", "one")]
         provider.send_error = True
         secret = "secret prompt"
-        with pytest.raises(RoutingError, match="Provider could not accept the prompt") as error:
+        with pytest.raises(RoutingError, match="Provider delivery failed or could not be confirmed") as error:
             await router.send(secret)
         assert secret not in str(error.value)
         assert secret not in "".join(traceback.format_exception(error.value))

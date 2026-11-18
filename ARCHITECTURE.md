@@ -89,3 +89,15 @@ transcriptions to the agent process (Claude Code, Cursor, Aider, etc.).
 dictare is the reference implementation of [OpenVIP](spec/) — an open spec for
 voice input to AI agents. Any tool can implement the SSE endpoint and receive
 voice commands from dictare.
+
+## Managed provider sessions
+
+Dictare owns separate Codex app-server connections through the optional official
+SDK; history resumption creates a new connection and does not attach to an
+existing terminal. Provider routing confirms a live connection identity before
+each delivery. Capture and review bind that identity, and a disconnected or
+uncertain destination is never silently replaced or retried. Managed agents
+translate newline/submit operations into provider turns; unconfirmed drafts
+remain local until explicitly discarded. The local-only API and UI expose
+connection metadata and responses without changing OpenVIP. Codex approval
+requests are declined until an explicit approval interface is implemented.

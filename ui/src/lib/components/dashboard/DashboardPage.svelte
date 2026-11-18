@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from "svelte";
+	import ProviderSessions from "./ProviderSessions.svelte";
 	import { fetchStatus, setOutputMode, setCurrentAgent, type StatusResponse } from "$lib/api";
 	import { updateDeviceLists } from "$lib/stores/settings.svelte";
 	import { Button } from "$lib/components/ui/button";
@@ -257,12 +258,14 @@
 			{/if}
 		</div>
 
+		<ProviderSessions />
+
 		<!-- Agents (full width below) -->
 		<div class="rounded-lg border bg-card p-4 space-y-2">
 			<h3 class="text-sm font-semibold">Agents</h3>
 			{#if p.output.available_agents.length > 0}
 				<div class="flex flex-wrap gap-2">
-					{#each p.output.available_agents as agent}
+					{#each p.output.available_agents.filter((agent) => !agent.startsWith('codex:')) as agent}
 						<button
 							onclick={() => handleAgentClick(agent)}
 							class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors

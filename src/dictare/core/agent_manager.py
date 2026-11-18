@@ -163,7 +163,7 @@ class AgentManager:
         self._notify()
         return True
 
-    def unregister(self, agent_id: str) -> bool:
+    def unregister(self, agent_id: str, *, fallback: bool = True) -> bool:
         """Unregister an agent by ID.
 
         Args:
@@ -182,7 +182,7 @@ class AgentManager:
 
         if was_current:
             visible = self.visible_agents
-            if visible:
+            if visible and fallback:
                 self._set_current(visible[0])
             else:
                 self._current_agent_id = None

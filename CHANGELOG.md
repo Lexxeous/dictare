@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Start or resume managed Codex sessions, select a confirmed destination, and
+  view responses and unconfirmed drafts in the Dashboard.
 - Add an optional macOS window for the existing local Dictare UI, with a
   separate menu-bar action and continued browser access.
 - Add form controls for sound feedback, audio tuning, speech recognition,
