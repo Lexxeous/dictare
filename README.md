@@ -232,6 +232,15 @@ A lost request connection is reported as unconfirmed rather than as success.
 
 ## Home and Documentation
 
+On macOS, the installed Dictare launcher can also show this interface in a
+native window. Choose **Continue in the app** on Home or **Open Dictare App**
+from the menu bar while the engine
+is connected; choosing it again focuses the same window. Closing the window
+hides it and leaves the engine running. **Settings...** continues to open the
+interface in your browser. The native window requires the updated Swift
+launcher and a local engine address; source-only or remote engines can still
+use the browser interface.
+
 Settings opens on **Home**, with Start listening / Stop listening controls,
 the current destination for your words, and voice-command and keyboard cheat
 sheets. Click the Dictare logo to return Home. On a narrow screen, use the menu
@@ -363,6 +372,10 @@ Open `http://127.0.0.1:5173/ui/`. In another terminal use
 `./scripts/dev.sh listen` to start capture or `./scripts/dev.sh pause` to stop
 capture. The local runner disables global hotkey handling; it does not use
 the installed macOS launcher to control the source engine.
+
+On macOS, run `./scripts/dev.sh app` to build and start the isolated source
+preview, then use **Continue in the app** on the local Home tab. The preview
+does not start an engine, install a service, or register a global hotkey.
 
 The runner uses this repository's `.venv`, keeps its copied config and runtime
 state under the ignored `.dictare-dev/` folder, and serves its engine on port

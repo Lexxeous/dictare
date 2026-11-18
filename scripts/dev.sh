@@ -20,6 +20,7 @@ Usage: ./scripts/dev.sh
   serve [ARGS…]       Run the local engine on port 18770
   ui                  Run the local settings UI on port 5173
   stack               Run the local engine and UI together
+  app                 Build and open the isolated macOS source preview
   listen              Start listening on the local engine
   pause               Stop listening on the local engine
   stop                Stop the verified local source engine
@@ -199,6 +200,44 @@ case "$command_name" in
     stack)
         [[ $# -eq 0 ]] || error "The stack command does not accept extra arguments. Set DICTARE_DEV_API_PORT or DICTARE_DEV_UI_PORT to change ports."
         run_stack
+        ;;
+    app)
+        [[ $# -eq 0 ]] || error "The app command does not accept arguments."
+        [[ "$(uname -s)" == Darwin ]] || error "The source preview requires macOS."
+        require_python
+        "$VENV_PYTHON" - <<'PY'
+import time
+from AppKit import NSRunningApplication
+
+apps = NSRunningApplication.runningApplicationsWithBundleIdentifier_("dev.dragfly.dictare.preview")
+for app in apps:
+    app.terminate()
+for _ in range(50):
+    if not NSRunningApplication.runningApplicationsWithBundleIdentifier_("dev.dragfly.dictare.preview"):
+        break
+    time.sleep(0.1)
+else:
+    raise SystemExit("Could not stop the existing source preview; close it and try again.")
+PY
+        preview="$DEV_DIR/Dictare Preview.app"
+        mkdir -p "$preview/Contents/MacOS" "$preview/Contents/Resources"
+        swiftc -O -o "$preview/Contents/MacOS/DictarePreview" "$ROOT_DIR/src/dictare/resources/launcher.swift"
+        cp "$ROOT_DIR/src/dictare/resources/Dictare.icns" "$preview/Contents/Resources/Dictare.icns"
+        "$VENV_PYTHON" - "$preview/Contents/Info.plist" <<'PY'
+import plistlib
+import sys
+
+with open(sys.argv[1], "wb") as output:
+    plistlib.dump({"CFBundleIdentifier": "dev.dragfly.dictare.preview",
+                   "CFBundleName": "Dictare Preview",
+                   "CFBundleExecutable": "DictarePreview",
+                   "CFBundlePackageType": "APPL",
+                   "CFBundleIconFile": "Dictare.icns",
+                   "LSUIElement": True}, output)
+PY
+        codesign --force --deep --sign - "$preview"
+        open -a "$preview" --args --source-preview
+        printf 'Source preview started. Use Continue in the app in the local UI.\n'
         ;;
     stop)
         [[ $# -eq 0 ]] || error "The stop command does not accept arguments."

@@ -44,10 +44,39 @@
 	}
 
 	let activeNavId = $state(defaultNavId());
+	let showAppLink = $state(false);
+	let appError = $state("");
+	let openingApp = $state(false);
+
+	onMount(() => {
+		showAppLink = /Mac/.test(navigator.platform) &&
+			["localhost", "127.0.0.1", "[::1]"].includes(location.hostname) &&
+			new URLSearchParams(location.search).get("native") !== "1";
+	});
+
+	async function openApp() {
+		openingApp = true;
+		appError = "";
+		try {
+			const response = await fetch("/api/system/open-app", {
+				method: "POST", headers: { "X-Dictare-UI": "1" }
+			});
+			if (!response.ok) {
+				if (response.status === 404) throw new Error("Restart the Dictare engine to use the app window.");
+				const body = await response.json();
+				throw new Error(body.detail || "Could not open the app");
+			}
+		} catch (error) {
+			appError = (error as Error).message;
+		} finally {
+			openingApp = false;
+		}
+	}
 
 	// Global SSE listener for device list updates — stays active on ALL tabs.
 	// DashboardPage has its own SSE for dashboard-specific status display.
 	let deviceSSE: EventSource | null = null;
+	let deviceRetry: ReturnType<typeof setTimeout> | undefined;
 
 	function connectDeviceSSE() {
 		deviceSSE = new EventSource("/openvip/status/stream");
@@ -63,7 +92,7 @@
 			deviceSSE?.close();
 			deviceSSE = null;
 			// Retry after 5s
-			setTimeout(connectDeviceSSE, 5000);
+			deviceRetry = setTimeout(connectDeviceSSE, 5000);
 		};
 	}
 
@@ -73,6 +102,7 @@
 	});
 
 	onDestroy(() => {
+		clearTimeout(deviceRetry);
 		deviceSSE?.close();
 	});
 
@@ -202,6 +232,15 @@
 				</div>
 				{#if activeNavId === "home"}
 					<HomePage />
+					{#if showAppLink}
+						<div class="px-4 mt-8 space-y-2">
+							<div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
+								<div><p class="text-sm font-medium">Continue in the app</p><p class="text-xs text-muted-foreground">Open Dictare in its macOS window.</p></div>
+								<Button variant="outline" onclick={openApp} disabled={openingApp}>Continue in the app</Button>
+							</div>
+							{#if appError}<p role="alert" class="text-sm text-destructive">{appError}</p>{/if}
+						</div>
+					{/if}
 					<div class="mt-8"><EngineStopControl /></div>
 				{:else}
 					{#await import("../home/DocumentationPage.svelte") then page}

@@ -6,7 +6,9 @@ Registered on the FastAPI app by OpenVIPServer._create_app().
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -195,9 +197,41 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
         return response
 
     @app.get("/settings")
-    async def settings_redirect():
+    async def settings_redirect(request: Request):
         """Redirect to Settings SPA."""
-        return RedirectResponse(url="/ui/")
+        query = f"?{request.url.query}" if request.url.query else ""
+        return RedirectResponse(url=f"/ui/{query}")
+
+    @app.post("/api/system/open-app")
+    async def open_native_app(request: Request):
+        """Ask the running launcher to show this local engine in its window."""
+        import sys
+
+        host = request.url.hostname
+        try:
+            local_client = bool(request.client and ipaddress.ip_address(request.client.host).is_loopback)
+        except ValueError:
+            local_client = False
+        if (not local_client or host not in ("localhost", "127.0.0.1", "::1")
+                or request.headers.get("origin") != str(request.base_url).rstrip("/")
+                or request.headers.get("x-dictare-ui") != "1"):
+            raise HTTPException(status_code=403, detail="Local UI request required")
+        if sys.platform != "darwin":
+            raise HTTPException(status_code=409, detail="The native app is only available on macOS")
+        from dictare.tray.app import _native_launcher_running
+
+        preview = os.environ.get("DICTARE_DEV_MODE") == "1"
+        bundle_id = "dev.dragfly.dictare.preview" if preview else "dev.dragfly.dictare"
+        if not _native_launcher_running(bundle_id):
+            detail = "Run ./scripts/dev.sh app to start the source preview" if preview else "Start the updated Dictare app first"
+            raise HTTPException(status_code=409, detail=detail)
+        from Foundation import NSDistributedNotificationCenter
+
+        NSDistributedNotificationCenter.defaultCenter().postNotificationName_object_userInfo_deliverImmediately_(
+            f"{bundle_id}.open-window", None,
+            {"host": "::1" if host == "::1" else "127.0.0.1", "port": request.url.port or 80}, True,
+        )
+        return {"ok": True}
 
     @app.get("/ui")
     async def ui_redirect():

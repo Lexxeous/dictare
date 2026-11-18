@@ -1,0 +1,3 @@
+name = "native-macos-window-12"
+bump = "minor"
+summary = "Add an optional native macOS window for the existing local Dictare interface."

@@ -1,12 +1,10 @@
 <script lang="ts">
-	import { onMount } from "svelte";
 	import SettingsLayout from "$lib/components/settings/SettingsLayout.svelte";
 	import { tabs } from "$lib/registry/tabs";
+	import { onMount } from "svelte";
 	import { initTabGuard, isEvicted } from "$lib/stores/tab-guard.svelte";
 
-	onMount(() => {
-		initTabGuard();
-	});
+	onMount(() => initTabGuard());
 </script>
 
 <svelte:head>

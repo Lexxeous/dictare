@@ -23,6 +23,7 @@ import AVFoundation
 import Cocoa
 import Darwin
 import Foundation
+import WebKit
 
 // ---------------------------------------------------------------------------
 // Request Input Monitoring (called during `dictare service install`)
@@ -152,7 +153,93 @@ func resolveModeSwitchModifier() -> CGEventFlags? {
 // ---------------------------------------------------------------------------
 // App Delegate — manages CGEventTap and child process
 // ---------------------------------------------------------------------------
-class LauncherDelegate: NSObject, NSApplicationDelegate {
+class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate {
+    var companionWindow: NSWindow?
+    var companionPort: Int = 8770
+    var companionHost = "127.0.0.1"
+    var companionLoadFailed = false
+
+    @objc func openCompanion(_ notification: Notification) {
+        guard let port = notification.userInfo?["port"] as? Int, (1...65535).contains(port),
+              let host = notification.userInfo?["host"] as? String,
+              ["127.0.0.1", "::1"].contains(host) else { return }
+        companionPort = port
+        companionHost = host
+        if companionWindow == nil {
+            let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+            webView.navigationDelegate = self
+            webView.uiDelegate = self
+            let window = NSWindow(contentRect: webView.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+            window.title = "Dictare"
+            window.contentView = webView
+            window.delegate = self
+            window.center()
+            companionWindow = window
+        }
+        if let webView = companionWindow?.contentView as? WKWebView,
+           webView.url?.port != port || webView.url?.host != host || companionLoadFailed {
+            var url = URLComponents()
+            url.scheme = "http"
+            url.host = host == "::1" ? "[::1]" : host
+            url.port = port
+            url.path = "/ui/"
+            url.queryItems = [URLQueryItem(name: "native", value: "1")]
+            if let destination = url.url {
+                companionLoadFailed = false
+                webView.load(URLRequest(url: destination))
+            }
+        }
+        companionWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if let window = companionWindow {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        return true
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        sender.orderOut(nil)
+        return false
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        companionLoadFailed = true
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        guard let window = companionWindow else { completionHandler(false); return }
+        let alert = NSAlert()
+        alert.messageText = message
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { response in
+            completionHandler(response == .alertFirstButtonReturn)
+        }
+    }
+
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        guard let url = navigationAction.request.url,
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
+        NSWorkspace.shared.open(url)
+        return nil
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
+        if url.scheme == "http", url.host == companionHost, url.port == companionPort {
+            decisionHandler(.allow)
+        } else {
+            if ["http", "https"].contains(url.scheme?.lowercased() ?? "") { NSWorkspace.shared.open(url) }
+            decisionHandler(.cancel)
+        }
+    }
+
     let controlledRestartExitCode: Int32 = 75
     let restartWindowSeconds: TimeInterval = 60.0
     let restartBurstLimit = 5
@@ -181,6 +268,13 @@ class LauncherDelegate: NSObject, NSApplicationDelegate {
     var hotkeyIsDown = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let preview = CommandLine.arguments.contains("--source-preview")
+        let notificationName = preview ? "dev.dragfly.dictare.preview.open-window" : "dev.dragfly.dictare.open-window"
+        DistributedNotificationCenter.default().addObserver(self, selector: #selector(openCompanion(_:)), name: Notification.Name(notificationName), object: nil)
+        if preview {
+            setupSignalHandling()
+            return
+        }
         hotkeyKeyCode = resolveHotkeyKeyCode()
         hotkeyFlagMask = flagMaskForKeyCode(hotkeyKeyCode)
         modeSwitchFlagMask = resolveModeSwitchModifier()

@@ -65,6 +65,28 @@ def _hide_dock_icon() -> None:
     except Exception:
         pass
 
+def _native_launcher_running(bundle_id: str = "dev.dragfly.dictare") -> bool:
+    """The optional window belongs to the installed app, not a source engine."""
+    if sys.platform != "darwin":
+        return False
+    try:
+        from AppKit import NSRunningApplication
+
+        return bool(NSRunningApplication.runningApplicationsWithBundleIdentifier_(
+            bundle_id
+        ))
+    except Exception:
+        logger.debug("Could not find the native launcher", exc_info=True)
+        return False
+
+def _native_loopback_host(host: str) -> str | None:
+    """Never load a remotely configured engine inside the native window."""
+    if host in ("127.0.0.1", "localhost", "0.0.0.0"):
+        return "127.0.0.1"
+    if host in ("::1", "::"):
+        return "::1"
+    return None
+
 def _patch_pystray_appindicator() -> None:
     """Monkey-patch pystray to save icons with .png extension on Linux.
 
@@ -300,6 +322,9 @@ class TrayApp:
             )
         items.append(pystray.MenuItem("Advanced", pystray.Menu(*advanced_items)))
 
+        if sys.platform == "darwin":
+            items.append(pystray.MenuItem("Open Dictare App", self._on_open_app, enabled=self._state != "disconnected" and _native_launcher_running()))
+
         # Settings — opens config file in editor
         items.append(pystray.MenuItem("Settings...", self._on_open_settings))
 
@@ -447,6 +472,21 @@ class TrayApp:
         from dictare.platform.permissions import open_input_monitoring_settings
 
         open_input_monitoring_settings()
+
+    def _on_open_app(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
+        """Ask the running macOS launcher to show its existing window."""
+        from Foundation import NSDistributedNotificationCenter
+
+        from dictare.config import load_config
+
+        server = load_config().server
+        host = _native_loopback_host(server.host)
+        if host is None:
+            logger.warning("Native window requires a local engine address")
+            return
+        NSDistributedNotificationCenter.defaultCenter().postNotificationName_object_userInfo_deliverImmediately_(
+            "dev.dragfly.dictare.open-window", None, {"host": host, "port": server.port}, True
+        )
 
     def _on_open_settings(
         self, icon: pystray.Icon, item: pystray.MenuItem

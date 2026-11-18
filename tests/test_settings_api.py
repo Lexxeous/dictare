@@ -40,6 +40,48 @@ class TestGetSettingsPage:
         assert r.status_code in (301, 302, 307, 308)
         assert "/ui" in r.headers.get("location", "")
 
+    def test_settings_redirect_preserves_native_marker(self, client):
+        r = client.get("/settings?native=1", follow_redirects=False)
+        assert r.headers["location"] == "/ui/?native=1"
+
+    def test_open_app_requires_same_origin_local_request(self, settings_app):
+        with TestClient(settings_app, base_url="http://localhost:8770", client=("127.0.0.1", 123)) as local:
+            response = local.post("/api/system/open-app", headers={"origin": "http://evil.example", "x-dictare-ui": "1"})
+            assert response.status_code == 403
+            response = local.post("/api/system/open-app", headers={"origin": "http://localhost:8770"})
+            assert response.status_code == 403
+        with TestClient(settings_app, base_url="http://localhost:8770", client=("192.0.2.1", 123)) as remote:
+            response = remote.post("/api/system/open-app", headers={"origin": "http://localhost:8770", "x-dictare-ui": "1"})
+            assert response.status_code == 403
+
+    def test_open_app_notifies_launcher_with_local_port(self, settings_app):
+        import sys
+        from unittest.mock import MagicMock
+
+        foundation = MagicMock()
+        with TestClient(settings_app, base_url="http://localhost:8770", client=("127.0.0.1", 123)) as local:
+            with patch.object(sys, "platform", "darwin"), patch.dict(sys.modules, {"Foundation": foundation}), patch("dictare.tray.app._native_launcher_running", return_value=True):
+                response = local.post("/api/system/open-app", headers={"origin": "http://localhost:8770", "x-dictare-ui": "1"})
+        assert response.status_code == 200
+        foundation.NSDistributedNotificationCenter.defaultCenter.return_value.postNotificationName_object_userInfo_deliverImmediately_.assert_called_once_with(
+            "dev.dragfly.dictare.open-window", None, {"host": "127.0.0.1", "port": 8770}, True
+        )
+
+    def test_source_open_app_targets_isolated_preview(self, settings_app, monkeypatch):
+        import sys
+        from unittest.mock import MagicMock
+
+        monkeypatch.setenv("DICTARE_DEV_MODE", "1")
+        foundation = MagicMock()
+        with TestClient(settings_app, base_url="http://127.0.0.1:5173", client=("127.0.0.1", 123)) as local:
+            with patch.object(sys, "platform", "darwin"), patch.dict(sys.modules, {"Foundation": foundation}), patch("dictare.tray.app._native_launcher_running", return_value=True) as running:
+                response = local.post("/api/system/open-app", headers={"origin": "http://127.0.0.1:5173", "x-dictare-ui": "1"})
+        assert response.status_code == 200
+        running.assert_called_once_with("dev.dragfly.dictare.preview")
+        foundation.NSDistributedNotificationCenter.defaultCenter.return_value.postNotificationName_object_userInfo_deliverImmediately_.assert_called_once_with(
+            "dev.dragfly.dictare.preview.open-window", None, {"host": "127.0.0.1", "port": 5173}, True
+        )
+
     def test_ui_serves_html(self, client):
         r = client.get("/ui/")
         assert r.status_code == 200

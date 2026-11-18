@@ -6,7 +6,7 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from dictare.tray.app import TrayApp
+from dictare.tray.app import TrayApp, _native_loopback_host
 
 
 def _mock_pystray():
@@ -217,6 +217,47 @@ class TestServiceMenu:
         labels = [i.text for i in advanced.action._items if hasattr(i, "text") and i.text != "---"]
         assert "Stop Service" in labels
         assert "Start Service" not in labels
+
+class TestNativeWindow:
+    def test_loopback_addresses(self) -> None:
+        for address in ("127.0.0.1", "localhost", "0.0.0.0"):
+            assert _native_loopback_host(address) == "127.0.0.1"
+        for address in ("::1", "::"):
+            assert _native_loopback_host(address) == "::1"
+        assert _native_loopback_host("example.com") is None
+
+    def test_menu_requires_running_launcher_and_engine(self) -> None:
+        app = TrayApp()
+        with patch.dict(sys.modules, {"pystray": _mock_pystray()}), \
+             patch("dictare.tray.app.sys.platform", "darwin"), \
+             patch("dictare.tray.app._native_launcher_running", return_value=True):
+            item = next(i for i in app._create_menu()._items if getattr(i, "text", "") == "Open Dictare App")
+            assert not item.enabled
+            app._state = "off"
+            item = next(i for i in app._create_menu()._items if getattr(i, "text", "") == "Open Dictare App")
+            assert item.enabled
+
+    def test_open_posts_local_address_and_configured_port(self) -> None:
+        app = TrayApp()
+        center = MagicMock()
+        foundation = SimpleNamespace(NSDistributedNotificationCenter=SimpleNamespace(defaultCenter=lambda: center))
+        config = SimpleNamespace(server=SimpleNamespace(host="::1", port=9876))
+        with patch.dict(sys.modules, {"Foundation": foundation}), \
+             patch("dictare.config.load_config", return_value=config):
+            app._on_open_app(None, None)
+        center.postNotificationName_object_userInfo_deliverImmediately_.assert_called_once_with(
+            "dev.dragfly.dictare.open-window", None, {"host": "::1", "port": 9876}, True
+        )
+
+    def test_remote_address_is_not_opened(self) -> None:
+        app = TrayApp()
+        center = MagicMock()
+        foundation = SimpleNamespace(NSDistributedNotificationCenter=SimpleNamespace(defaultCenter=lambda: center))
+        config = SimpleNamespace(server=SimpleNamespace(host="example.com", port=9876))
+        with patch.dict(sys.modules, {"Foundation": foundation}), \
+             patch("dictare.config.load_config", return_value=config):
+            app._on_open_app(None, None)
+        center.postNotificationName_object_userInfo_deliverImmediately_.assert_not_called()
 
     def test_start_service_shown_when_disconnected(self) -> None:
         """When engine is unreachable, show Start Service."""

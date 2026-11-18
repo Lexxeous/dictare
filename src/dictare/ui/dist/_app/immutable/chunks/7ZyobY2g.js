@@ -1,4 +1,4 @@
-import{d as Fe,g as Ln,a as On,f as Nn}from"./C4jTMyNc.js";import{i as qn}from"./CPA1XZ4M.js";import{o as Un}from"./DOYktvyX.js";import{t as sn,q as Se,v as Te,G as $n,aU as Wn,F as Be,I as Zn,a8 as Hn,af as Xn,a9 as Yn,z as Gn,a7 as re,p as Kn,g as ie,s as Ie,m as fe,n as de,an as Vn,k as Qn,aA as et}from"./CqrUEmVv.js";import{s as nt}from"./DnfVRnuk.js";import{b as tt}from"./Dh7NKhy1.js";import{b as rt}from"./Dwjod-wH.js";function it(e,n,t=!1,o=!1,r=!1){var i=e,s="";sn(()=>{var a=$n;if(s===(s=n()??"")){Se&&Te();return}if(a.nodes!==null&&(Wn(a.nodes.start,a.nodes.end),a.nodes=null),s!==""){if(Se){Be.data;for(var u=Te(),c=u;u!==null&&(u.nodeType!==Zn||u.data!=="");)c=u,u=Hn(u);if(u===null)throw Xn(),Yn;Fe(Be,c),i=Gn(u);return}var h=s+"";t?h=`<svg>${h}</svg>`:o&&(h=`<math>${h}</math>`);var f=Ln(h);if((t||o)&&(f=re(f)),Fe(re(f),f.lastChild),t||o)for(;re(f);)i.before(re(f));else i.before(f)}})}const ot=`<div align="center">
+import{d as Fe,g as Ln,a as On,f as Nn}from"./C4jTMyNc.js";import{i as qn}from"./CPA1XZ4M.js";import{o as Un}from"./DOYktvyX.js";import{t as sn,q as Se,v as Te,G as $n,aU as Wn,F as Be,I as Zn,a8 as Hn,af as Xn,a9 as Yn,z as Gn,a7 as re,p as Kn,g as ie,s as Ie,m as fe,n as de,an as Vn,k as Qn,aA as et}from"./CqrUEmVv.js";import{s as nt}from"./Ci3STrpx.js";import{b as tt}from"./Dh7NKhy1.js";import{b as rt}from"./CBnPLHNB.js";function it(e,n,t=!1,o=!1,r=!1){var i=e,s="";sn(()=>{var a=$n;if(s===(s=n()??"")){Se&&Te();return}if(a.nodes!==null&&(Wn(a.nodes.start,a.nodes.end),a.nodes=null),s!==""){if(Se){Be.data;for(var u=Te(),c=u;u!==null&&(u.nodeType!==Zn||u.data!=="");)c=u,u=Hn(u);if(u===null)throw Xn(),Yn;Fe(Be,c),i=Gn(u);return}var h=s+"";t?h=`<svg>${h}</svg>`:o&&(h=`<math>${h}</math>`);var f=Ln(h);if((t||o)&&(f=re(f)),Fe(re(f),f.lastChild),t||o)for(;re(f);)i.before(re(f));else i.before(f)}})}const ot=`<div align="center">
 
 <img src="https://raw.githubusercontent.com/dragfly/dictare/main/assets/icon.svg" width="80" height="80" alt="dictare icon">
 
@@ -232,6 +232,15 @@ A lost request connection is reported as unconfirmed rather than as success.
 
 ## Home and Documentation
 
+On macOS, the installed Dictare launcher can also show this interface in a
+native window. Choose **Continue in the app** on Home or **Open Dictare App**
+from the menu bar while the engine
+is connected; choosing it again focuses the same window. Closing the window
+hides it and leaves the engine running. **Settings...** continues to open the
+interface in your browser. The native window requires the updated Swift
+launcher and a local engine address; source-only or remote engines can still
+use the browser interface.
+
 Settings opens on **Home**, with Start listening / Stop listening controls,
 the current destination for your words, and voice-command and keyboard cheat
 sheets. Click the Dictare logo to return Home. On a narrow screen, use the menu
@@ -363,6 +372,10 @@ Open \`http://127.0.0.1:5173/ui/\`. In another terminal use
 \`./scripts/dev.sh listen\` to start capture or \`./scripts/dev.sh pause\` to stop
 capture. The local runner disables global hotkey handling; it does not use
 the installed macOS launcher to control the source engine.
+
+On macOS, run \`./scripts/dev.sh app\` to build and start the isolated source
+preview, then use **Continue in the app** on the local Home tab. The preview
+does not start an engine, install a service, or register a global hotkey.
 
 The runner uses this repository's \`.venv\`, keeps its copied config and runtime
 state under the ignored \`.dictare-dev/\` folder, and serves its engine on port

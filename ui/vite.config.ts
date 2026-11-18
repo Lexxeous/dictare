@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
 				...(env.DICTARE_DEV_DEPENDENCIES ? [env.DICTARE_DEV_DEPENDENCIES] : [])
 			] },
 			proxy: {
-				'/api': apiTarget,
+				'/api': { target: apiTarget, changeOrigin: false },
 				'/openvip': apiTarget
 			}
 		}

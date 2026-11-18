@@ -15,7 +15,8 @@ let channel: BroadcastChannel | null = null;
 export function initTabGuard(): void {
 	if (channel) return;
 
-	channel = new BroadcastChannel(CHANNEL_NAME);
+	const nativeWindow = new URLSearchParams(window.location.search).get("native") === "1";
+	channel = new BroadcastChannel(nativeWindow ? `${CHANNEL_NAME}-native` : CHANNEL_NAME);
 
 	channel.onmessage = (event: MessageEvent) => {
 		if (event.data?.type === "takeover") {

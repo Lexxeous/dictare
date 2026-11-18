@@ -47,6 +47,12 @@ src/dictare/
 
 On macOS, a Swift launcher (`Dictare.app`) handles `CGEventTap` for the hotkey,
 communicating with the Python engine via Unix socket IPC.
+The launcher also owns an optional single AppKit/WebKit window, requested by
+the tray through a local distributed notification. It loads the existing UI
+from a loopback engine address; the browser and window share the engine and
+settings, while keeping separate tab-takeover groups. Closing the window hides
+it without changing engine lifecycle. This window requires the Swift launcher;
+the browser remains usable with source or remote engines.
 
 ## STT Engines
 
