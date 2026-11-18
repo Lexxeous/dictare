@@ -49,3 +49,16 @@ def test_source_control_only_accepts_specific_local_commands(monkeypatch):
     engine.handle_protocol_command.assert_not_called()
     assert client.post("/api/dev/control", json={"command": "engine.shutdown"}).json() == {"status": "ok"}
     engine.handle_protocol_command.assert_called_once_with({"command": "engine.shutdown"})
+
+
+def test_source_can_simulate_press_and_release_without_a_global_hotkey(monkeypatch):
+    monkeypatch.setenv('DICTARE_DEV_MODE', '1')
+    controller = MagicMock()
+    server = OpenVIPServer(MagicMock(), controller)
+    client = TestClient(server._app, base_url='http://127.0.0.1:18770', client=('127.0.0.1', 1234))
+    assert client.post('/api/dev/hotkey', json={'event': 'down'}).status_code == 200
+    assert client.post('/api/dev/hotkey', json={'event': 'up'}).status_code == 200
+    assert client.post('/api/dev/hotkey', json={'event': 'unknown'}).status_code == 400
+    assert client.post('/api/dev/hotkey', json={'event': []}).status_code == 400
+    controller.on_hotkey_key_down.assert_called_once()
+    controller.on_hotkey_key_up.assert_called_once()

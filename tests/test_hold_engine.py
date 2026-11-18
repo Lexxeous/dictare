@@ -187,3 +187,32 @@ def test_restored_standard_mute_starts_in_resume_only_listening(monkeypatch):
     assert engine.state == AppState.LISTENING
     assert engine._voice_muted and engine._should_process_capture()
     assert not engine._hold_capture_active
+
+
+def test_factory_enables_experimental_hold_only_in_explicit_source_mode(monkeypatch):
+    from unittest.mock import patch
+
+    from dictare.core.engine import create_engine
+
+    monkeypatch.setenv('DICTARE_DEV_EXPERIMENTAL_HOLD', '1')
+    monkeypatch.delenv('DICTARE_DEV_MODE', raising=False)
+    with patch('dictare.core.engine.DictareEngine') as constructor:
+        create_engine(Config(), MagicMock())
+        assert constructor.call_args.kwargs['experimental_hold'] is False
+        monkeypatch.setenv('DICTARE_DEV_MODE', '1')
+        create_engine(Config(), MagicMock())
+        assert constructor.call_args.kwargs['experimental_hold'] is True
+
+
+def test_factory_enables_hold_from_saved_configuration(monkeypatch):
+    from unittest.mock import patch
+
+    from dictare.core.engine import create_engine
+
+    monkeypatch.delenv('DICTARE_DEV_MODE', raising=False)
+    monkeypatch.delenv('DICTARE_DEV_EXPERIMENTAL_HOLD', raising=False)
+    config = Config()
+    config.hotkey.activation_mode = 'hold'
+    with patch('dictare.core.engine.DictareEngine') as constructor:
+        create_engine(config, MagicMock())
+        assert constructor.call_args.kwargs['experimental_hold'] is True

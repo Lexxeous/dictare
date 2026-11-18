@@ -293,6 +293,10 @@ class StateController:
     def _handle_transcription_complete(self, event: TranscriptionCompleted) -> None:
         """Transcription finished."""
         self._cancel_transcription_watchdog()
+        if event.source == "timeout" and self._engine and getattr(self._engine, "_phrase_gate", None):
+            # A late worker must not append to a prompt after the watchdog has
+            # returned the controller to listening. Invalidate its capture too.
+            self._engine.discard_current_internal()
         # If TTS is playing, defer the state transition
         if self.play_in_progress:
             # Store for later processing when TTS completes
@@ -300,7 +304,8 @@ class StateController:
             # Still inject the text (goes to correct agent via captured agent)
             if self._engine and event.text:
                 self._engine.inject_text(event.text, agent=event.agent, language=event.language,
-                                         **({"capture_generation": event.capture_generation} if event.capture_generation is not None else {}))
+                                         **({"capture_generation": event.capture_generation} if event.capture_generation is not None else {}),
+                                         **({"submit": True} if event.submit else {}))
             return
 
         # Normal flow: transition to target state and inject
@@ -313,7 +318,8 @@ class StateController:
 
         if self._engine and event.text:
             self._engine.inject_text(event.text, agent=event.agent, language=event.language,
-                                     **({"capture_generation": event.capture_generation} if event.capture_generation is not None else {}))
+                                     **({"capture_generation": event.capture_generation} if event.capture_generation is not None else {}),
+                                     **({"submit": True} if event.submit else {}))
 
         if target_state == AppState.OFF:
             self._discard_capture()

@@ -233,7 +233,7 @@ export type StatusResponse = {
 		stt: { model_name: string; device: string; last_text: string };
 		tts: { engine: string; language: string; available: boolean; error: string | null };
 		output: { mode: string; current_agent: string; available_agents: string[] };
-		hotkey: { key: string; bound: boolean; status?: string };
+		hotkey: { key: string; bound: boolean; status?: string; activation_mode?: "toggle" | "hold" | "wake"; wake_state?: "waiting" | "capturing" | null };
 		permissions: Record<string, boolean>;
 		engines: {
 			tts: EngineInfo[];

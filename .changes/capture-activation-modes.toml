@@ -1,3 +1,3 @@
 name = "capture-activation-modes"
-bump = "patch"
-summary = "Honor pending stop requests after short recordings."
+bump = "minor"
+summary = "Add local wake/end phrase capture and hold-to-talk shortcuts."

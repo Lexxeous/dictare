@@ -45,6 +45,7 @@ class HotkeyIPCServer:
         on_combo: Callable[[], None] | None = None,
         socket_path: Path | None = None,
         accept_timeout: float = 0.5,
+        paired_gestures: bool = False,
     ) -> None:
         self._on_tap = on_tap
         self._on_key_down = on_key_down
@@ -53,6 +54,7 @@ class HotkeyIPCServer:
         self._on_combo = on_combo
         self._socket_path = socket_path or DEFAULT_SOCKET_PATH
         self._accept_timeout = accept_timeout
+        self._paired_gestures = paired_gestures
         self._server_sock: socket.socket | None = None
         self._thread: threading.Thread | None = None
         self._running = threading.Event()
@@ -60,6 +62,8 @@ class HotkeyIPCServer:
         self._delivered_count = 0
         self._last_delivered_ts = 0.0
         self._confirmed_hash_saved = False
+        self._gesture_lock = threading.Lock()
+        self._recent_gestures: dict[tuple[int, float], float] = {}
 
     @property
     def socket_path(self) -> Path:
@@ -139,13 +143,29 @@ class HotkeyIPCServer:
             msg_type = str(msg.get("type", ""))
             seq = int(msg.get("seq", -1))
 
+            if msg_type == "hotkey.capabilities":
+                conn.sendall((json.dumps({
+                    "type": "ack", "seq": seq, "paired_gestures": self._paired_gestures,
+                }) + "\n").encode())
+                return
+
+            if msg_type == "gesture.begin":
+                if self._paired_gestures:
+                    self._handle_gesture(conn, msg)
+                return
+
+            # Legacy independent connections cannot prove press/release order.
+            if self._paired_gestures and msg_type in ("key.down", "key.up", "other_key"):
+                return
+
             if msg_type == "hotkey.tap":
                 try:
                     self._on_tap()
-                    with self._lock:
-                        self._delivered_count += 1
-                        self._last_delivered_ts = time.time()
-                        self._write_runtime_status_locked()
+                    if not self._paired_gestures:
+                        with self._lock:
+                            self._delivered_count += 1
+                            self._last_delivered_ts = time.time()
+                            self._write_runtime_status_locked()
                 except Exception:
                     logger.exception("Hotkey IPC callback failed (hotkey.tap)")
             elif msg_type == "key.down":
@@ -193,6 +213,85 @@ class HotkeyIPCServer:
                 conn.close()
             except OSError:
                 pass
+
+    def _handle_gesture(self, conn: socket.socket, begin: dict[str, Any]) -> None:
+        """Keep a gesture on one connection; losing it cancels the turn.
+
+        A fresh begin is required because a queued connection must never start
+        recording long after the physical press. Only one gesture can own the
+        callbacks at a time, and an uncertain end is always discarded.
+        """
+        timestamp = begin.get("ts")
+        if not isinstance(timestamp, (int, float)) or not 0 <= time.time() - timestamp <= 1:
+            return
+        if self._on_key_down is None or self._on_key_up is None or self._on_other_key is None:
+            return
+        if not self._gesture_lock.acquire(blocking=False):
+            return
+        started = False
+        try:
+            seq = begin.get("seq")
+            if not isinstance(seq, int) or isinstance(seq, bool) or seq < 0:
+                return
+            now = time.monotonic()
+            self._recent_gestures = {
+                key: expires for key, expires in self._recent_gestures.items() if expires > now
+            }
+            identity = (seq, float(timestamp))
+            if identity in self._recent_gestures:
+                return
+            # Remember rejected or interrupted starts too: an uncertain begin
+            # must not create a second capture if the sender retries it.
+            self._recent_gestures[identity] = now + 65
+            started = True
+            self._on_key_down()
+            conn.sendall((json.dumps({"type": "ack", "seq": int(begin.get("seq", -1))}) + "\n").encode())
+            conn.settimeout(0.5)
+            deadline = time.monotonic() + 65
+            data = b""
+            while self._running.is_set() and time.monotonic() < deadline:
+                try:
+                    chunk = conn.recv(4096)
+                except TimeoutError:
+                    continue
+                if not chunk:
+                    break
+                data += chunk
+                if len(data) > 4096:
+                    break
+                if b"\n" not in data:
+                    continue
+                end = json.loads(data.split(b"\n", 1)[0])
+                if not isinstance(end, dict):
+                    break
+                end_seq = end.get("seq")
+                if not isinstance(end_seq, int) or isinstance(end_seq, bool) or end_seq <= seq:
+                    break
+                if end.get("type") == "gesture.end" and self._running.is_set():
+                    self._on_key_up()
+                    started = False
+                    with self._lock:
+                        self._delivered_count += 1
+                        self._last_delivered_ts = time.time()
+                        self._write_runtime_status_locked()
+                elif end.get("type") == "gesture.cancel":
+                    self._on_other_key()
+                    started = False
+                else:
+                    break
+                conn.sendall((json.dumps({"type": "ack", "seq": end_seq}) + "\n").encode())
+                break
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            logger.debug("Invalid or disconnected hotkey gesture", exc_info=True)
+        except Exception:
+            logger.exception("Hotkey gesture callback failed")
+        finally:
+            if started:
+                try:
+                    self._on_other_key()
+                except Exception:
+                    logger.exception("Failed to cancel disconnected hotkey gesture")
+            self._gesture_lock.release()
 
     def _write_runtime_status(self) -> None:
         with self._lock:

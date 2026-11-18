@@ -31,6 +31,7 @@ from dictare.core.fsm import (
     TranscriptionCompleted,
 )
 from dictare.core.openvip_messages import create_message
+from dictare.core.phrase_gate import PhraseGate
 from dictare.core.prompt_review import ReviewSlot, ReviewSnapshot, UnavailableReviewAgent
 from dictare.core.status_report import build_status, check_launcher_hash
 from dictare.core.tts_manager import TTSManager
@@ -147,6 +148,9 @@ class DictareEngine:
         self._hold_capture_generation = 0
         self._hold_complete_lock = threading.Lock()
         self.config = config
+        self._phrase_gate = (PhraseGate(config.hotkey.wake_phrase, config.hotkey.end_phrase)
+                             if config.hotkey.activation_mode == "wake" else None)
+        self._phrase_agent: Agent | None = None
         self._events = events
 
         # Session stats (single mutable container)
@@ -858,6 +862,7 @@ class DictareEngine:
         never inject stale text or corrupt state.
         """
         transcribed_text = ""
+        submit = False
         detected_language: str | None = None
         if capture_generation is None:
             capture_generation = self._capture_generation
@@ -890,6 +895,19 @@ class DictareEngine:
                 text = stt_result.text
                 detected_language = stt_result.language
 
+                if self._phrase_gate and not self._voice_muted:
+                    if self._phrase_gate.capturing and captured_agent is not self._phrase_agent:
+                        self._phrase_gate.reset()
+                        self._phrase_agent = None
+                    was_capturing = self._phrase_gate.capturing
+                    result = self._phrase_gate.accept(text)
+                    if not was_capturing and (result.capturing or result.completed):
+                        self._phrase_agent = captured_agent
+                    text = result.text
+                    submit = result.completed and bool(text)
+                    if result.completed or result.discarded:
+                        self._phrase_agent = None
+
                 if text:
                     transcribed_text = text
                     self._last_text = text
@@ -918,6 +936,10 @@ class DictareEngine:
                         return
 
         except Exception as e:
+            with self._injection_lock:
+                if self._phrase_gate and self._stt_generation_current(generation):
+                    self._phrase_gate.reset()
+                    self._phrase_agent = None
             logger.exception("STT transcription failed")
             if self._logger:
                 self._logger.log_error(str(e), context="transcribe_and_process")
@@ -934,6 +956,7 @@ class DictareEngine:
                             language=detected_language if transcribed_text else None,
                             source="stt",
                             capture_generation=capture_generation,
+                            submit=submit,
                         )
                     )
 
@@ -973,14 +996,14 @@ class DictareEngine:
     # Text Injection
     # -------------------------------------------------------------------------
 
-    def inject_text(self, text: str, *, agent: Agent | None = None, language: str | None = None, capture_generation: int | None = None) -> None:
+    def inject_text(self, text: str, *, agent: Agent | None = None, language: str | None = None, capture_generation: int | None = None, submit: bool = False) -> None:
         """Reject canceled capture before filters, executors, delivery or feedback."""
         with self._injection_lock:
             if (self.requested_exit_reason not in {"protocol_shutdown", "protocol_restart", "signal_shutdown"}
                     and self.capture_allowed(capture_generation)):
-                self._inject_text_current(text, agent=agent, language=language)
+                self._inject_text_current(text, agent=agent, language=language, submit=submit)
 
-    def _inject_text_current(self, text: str, *, agent: Agent | None = None, language: str | None = None) -> None:
+    def _inject_text_current(self, text: str, *, agent: Agent | None = None, language: str | None = None, submit: bool = False) -> None:
         """Inject text into the target agent.
 
         Uses OpenVIP message format - each agent handles its own transport:
@@ -1027,10 +1050,10 @@ class DictareEngine:
 
         # Build OpenVIP transcription message
         message = create_message(text, language=message_language)
-        if auto_submit or submit_from_double_tap:
+        if auto_submit or submit_from_double_tap or submit:
             message["x_input"] = {
                 "ops": ["submit"],
-                "source": "dictare/double-tap" if submit_from_double_tap else "dictare/engine",
+                "source": "dictare/double-tap" if submit_from_double_tap else "dictare/wake-end" if submit else "dictare/engine",
                 **({"trigger": "<double_tap>"} if submit_from_double_tap else {}),
             }
         else:
@@ -1387,6 +1410,9 @@ class DictareEngine:
             if self._voice_muted or self._strict_muted:
                 return
             self._voice_muted = True
+            if self._phrase_gate:
+                self._phrase_gate.reset()
+                self._phrase_agent = None
             if self._hold_gate:
                 self._hold_gate.cancel()
             self._voice_mute_pending = True
@@ -1537,12 +1563,16 @@ class DictareEngine:
 
     def set_output_mode(self, mode: str) -> None:
         """Switch output mode at runtime (keyboard <-> agents)."""
-        self._agent_mgr.set_output_mode(mode)
+        with self._injection_lock:
+            if self._phrase_gate:
+                self._phrase_gate.reset()
+                self._phrase_agent = None
+            self._agent_mgr.set_output_mode(mode)
 
     def toggle_mode(self) -> None:
         """Toggle between agent mode and keyboard mode."""
         new_mode = "keyboard" if self.agent_mode else "agents"
-        self._agent_mgr.set_output_mode(new_mode)
+        self.set_output_mode(new_mode)
 
     # -------------------------------------------------------------------------
     # Agent Control
@@ -1611,7 +1641,11 @@ class DictareEngine:
 
     def switch_agent_internal(self, direction: int) -> None:
         """Internal: Actually switch agent. Called by controller."""
-        self._agent_mgr.switch_by_direction(direction)
+        with self._injection_lock:
+            if self._phrase_gate:
+                self._phrase_gate.reset()
+                self._phrase_agent = None
+            self._agent_mgr.switch_by_direction(direction)
 
     def switch_to_agent_by_name(self, name: str) -> bool:
         """Switch to a specific agent by name - sends event to controller.
@@ -1625,7 +1659,11 @@ class DictareEngine:
 
     def switch_to_agent_by_name_internal(self, name: str) -> bool:
         """Internal: Actually switch by name. Called by controller."""
-        return self._agent_mgr.switch_by_name(name)
+        with self._injection_lock:
+            if self._phrase_gate:
+                self._phrase_gate.reset()
+                self._phrase_agent = None
+            return self._agent_mgr.switch_by_name(name)
 
     def switch_to_agent_by_index(self, index: int) -> bool:
         """Switch to a specific agent by index (1-based) - sends event."""
@@ -1634,7 +1672,11 @@ class DictareEngine:
 
     def switch_to_agent_by_index_internal(self, index: int) -> bool:
         """Internal: Actually switch by index. Called by controller."""
-        return self._agent_mgr.switch_by_index(index)
+        with self._injection_lock:
+            if self._phrase_gate:
+                self._phrase_gate.reset()
+                self._phrase_agent = None
+            return self._agent_mgr.switch_by_index(index)
 
     def discard_current(self) -> None:
         """Discard current recording/transcription - sends event."""
@@ -1649,6 +1691,9 @@ class DictareEngine:
                 # callback already in flight must retain its old identity.
                 self.audio_manager.reset_vad()
             self._capture_generation += 1
+            if self._phrase_gate:
+                self._phrase_gate.reset()
+                self._phrase_agent = None
             self._submit_pending = False
             shutdown = False
             while True:
@@ -2076,13 +2121,20 @@ def create_engine(
     Returns:
         Configured DictareEngine instance.
     """
+    import os
+
     _log = logging.getLogger(__name__)
+    experimental_hold = config.hotkey.activation_mode == "hold" or (
+        os.environ.get("DICTARE_DEV_MODE") == "1"
+        and os.environ.get("DICTARE_DEV_EXPERIMENTAL_HOLD") == "1"
+    )
 
     engine = DictareEngine(
         config=config,
         events=events,
         logger=logger,
         hotkey_enabled=hotkey_enabled,
+        experimental_hold=experimental_hold,
     )
 
     # Always create KeyboardAgent — mode switch just changes current_agent_id

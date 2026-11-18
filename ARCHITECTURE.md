@@ -54,6 +54,14 @@ settings, while keeping separate tab-takeover groups. Closing the window hides
 it without changing engine lifecycle. This window requires the Swift launcher;
 the browser remains usable with source or remote engines.
 
+Hold mode negotiates a paired gesture over one socket, keeping the connection
+open through release. Disconnect, timeout, overlap and stale/replayed gestures
+fail closed; a legacy tap cannot start a hold. The launcher must be updated and
+fully restarted to provide this protocol. Wake mode uses the existing local STT
+and gates recognized text before transcript logs, commands and delivery. Its
+bounded in-memory end-phrase buffer is reset on invalidation or target changes;
+the delivery lock serializes those resets with recognized results.
+
 ## STT Engines
 
 Capture lifetime is separate from recognition-worker recovery. VAD events,

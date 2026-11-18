@@ -46,6 +46,11 @@ without the development identity endpoint, stop their original terminal.
 Use `./scripts/dev.sh hotkey` to simulate one hotkey tap in the source engine
 when testing shortcut-dependent behavior. This is a loopback-only development
 route; it does not register a global shortcut or control the installed engine.
+`./scripts/dev.sh hotkey-down` and `./scripts/dev.sh hotkey-up` simulate the
+individual edges. For work on the unfinished hold-capture implementation,
+`DICTARE_DEV_EXPERIMENTAL_HOLD=1 ./scripts/dev.sh stack` forces hold in the
+source stack; hold can also be selected in settings. Neither is evidence of
+hardware validation. See [the capture checkpoint](CAPTURE-HEADSET-CHECKPOINT.md).
 The source serve/stack runners honor Dictare's restart exit code after settings
 changes. Normal shutdown exits; Ctrl+C stops only their owned engine/UI process
 groups, including child processes, without managing the installed service.

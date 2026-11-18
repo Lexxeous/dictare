@@ -236,6 +236,7 @@ class TranscriptionCompleted(StateMessage):
     agent: Any = None  # The agent to use for injection
     language: str | None = None  # Detected language from STT
     capture_generation: int | None = None
+    submit: bool = False
 
 @dataclass(frozen=True)
 class PlayStarted(StateMessage):

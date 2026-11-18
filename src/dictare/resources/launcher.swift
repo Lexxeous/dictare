@@ -264,6 +264,10 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
 
     // Track whether key.down was sent via IPC so we send key.up the same way
     var keyDownSentViaIPC = false
+    // Experimental hold gestures keep one socket open until release or cancel.
+    var gestureSocket: Int32 = -1
+    var pairedGestureSelected = false
+    var serverSupportsPairedGestures = false
     // Track whether the hotkey modifier is currently held down (for combo detection)
     var hotkeyIsDown = false
 
@@ -631,11 +635,28 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         return env.lowercased()
     }
 
-    /// Send key.down to Python via IPC.  Falls back to SIGUSR1 (hotkey.tap) if IPC fails.
+    /// Negotiate before sending an edge. The capability query has no side
+    /// effects, so a failed query can safely use the legacy tap signal.
     func sendKeyDown() {
+        serverSupportsPairedGestures = false
+        let mode = hotkeyTransportMode()
+        if mode != "signal" {
+            hotkeySeq += 1
+            if !sendIPCMessage(type: "hotkey.capabilities", seq: hotkeySeq) {
+                pairedGestureSelected = false
+                keyDownSentViaIPC = false
+                fputs("Hotkey: unable to negotiate with engine; using tap signal\n", stderr)
+                sendToggleSignal()
+                return
+            }
+        }
+        pairedGestureSelected = mode != "signal" && (experimentalHoldTransport() || serverSupportsPairedGestures)
+        if pairedGestureSelected {
+            beginGesture()
+            return
+        }
         hotkeySeq += 1
         let seq = hotkeySeq
-        let mode = hotkeyTransportMode()
 
         if mode != "signal" {
             if sendIPCMessage(type: "key.down", seq: seq) {
@@ -643,7 +664,9 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
                 keyDownSentViaIPC = true
                 return
             }
-            fputs("Hotkey: IPC key.down failed (seq \(seq)) — falling back to SIGUSR1\n", stderr)
+            fputs("Hotkey: IPC key.down failed (seq \(seq)); gesture ignored\n", stderr)
+            keyDownSentViaIPC = false
+            return
         }
         // SIGUSR1 fallback: simulate a complete tap (Python on_hotkey_tap does down+up)
         keyDownSentViaIPC = false
@@ -652,6 +675,11 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
 
     /// Send key.up to Python via IPC (only if key.down was sent via IPC).
     func sendKeyUp() {
+        if pairedGestureSelected {
+            finishGesture(type: "gesture.end")
+            pairedGestureSelected = false
+            return
+        }
         guard keyDownSentViaIPC else {
             // key.down was sent as SIGUSR1; key.up is a no-op (tap already simulated)
             return
@@ -674,6 +702,10 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
 
     /// Send other_key to Python via IPC (combo detection).
     func sendOtherKey() {
+        if pairedGestureSelected {
+            finishGesture(type: "gesture.cancel")
+            return
+        }
         guard keyDownSentViaIPC else {
             // key.down was sent as SIGUSR1; combo detection not possible
             return
@@ -697,6 +729,73 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         } else {
             fputs("Hotkey: IPC key.combo failed (seq \(seq)) — no fallback\n", stderr)
         }
+    }
+
+    func experimentalHoldTransport() -> Bool {
+        let env = ProcessInfo.processInfo.environment
+        return env["DICTARE_DEV_MODE"] == "1" && env["DICTARE_DEV_EXPERIMENTAL_HOLD"] == "1"
+    }
+
+    func beginGesture() {
+        guard gestureSocket < 0 else { return }
+        let socketPath = NSHomeDirectory() + "/.dictare/hotkey.sock"
+        let maxPathLen = MemoryLayout.size(ofValue: sockaddr_un().sun_path)
+        guard socketPath.utf8.count < maxPathLen else { return }
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return }
+        var timeout = timeval(tv_sec: 0, tv_usec: 250_000)
+        withUnsafePointer(to: &timeout) { ptr in
+            _ = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, ptr, socklen_t(MemoryLayout<timeval>.size))
+            _ = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, ptr, socklen_t(MemoryLayout<timeval>.size))
+        }
+        var noSigPipe: Int32 = 1
+        _ = setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
+        var addr = sockaddr_un()
+        addr.sun_family = sa_family_t(AF_UNIX)
+        socketPath.withCString { cs in
+            withUnsafeMutablePointer(to: &addr.sun_path) { sp in
+                sp.withMemoryRebound(to: CChar.self, capacity: maxPathLen) { cp in
+                    strncpy(cp, cs, maxPathLen - 1)
+                    cp[maxPathLen - 1] = 0
+                }
+            }
+        }
+        let result = withUnsafePointer(to: &addr) { ptr in
+            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sap in
+                connect(fd, sap, socklen_t(MemoryLayout<sockaddr_un>.size))
+            }
+        }
+        guard result == 0 else { _ = close(fd); return }
+        hotkeySeq += 1
+        guard sendGestureMessage(fd: fd, type: "gesture.begin", seq: hotkeySeq) else {
+            _ = close(fd)
+            return
+        }
+        gestureSocket = fd
+    }
+
+    func finishGesture(type: String) {
+        guard gestureSocket >= 0 else { return }
+        let fd = gestureSocket
+        gestureSocket = -1
+        hotkeySeq += 1
+        _ = sendGestureMessage(fd: fd, type: type, seq: hotkeySeq)
+        _ = close(fd)
+    }
+
+    func sendGestureMessage(fd: Int32, type: String, seq: UInt64) -> Bool {
+        let payload = "{\"type\":\"\(type)\",\"seq\":\(seq),\"ts\":\(Date().timeIntervalSince1970)}\n"
+        let sent = payload.withCString { send(fd, $0, strlen($0), 0) }
+        guard sent == payload.utf8.count else { return false }
+        var buffer = [UInt8](repeating: 0, count: 512)
+        let count = recv(fd, &buffer, buffer.count, 0)
+        guard count > 0,
+              let line = String(decoding: buffer[0..<count], as: UTF8.self).split(separator: "\n").first,
+              let data = line.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let ack = object["type"] as? String,
+              let ackSeq = object["seq"] as? NSNumber else { return false }
+        return ack == "ack" && ackSeq.uint64Value == seq
     }
 
     /// Send a single IPC message to the Python engine and wait for ACK.
@@ -763,7 +862,11 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         else {
             return false
         }
-        return ackType == "ack" && ackSeq.uint64Value == seq
+        let valid = ackType == "ack" && ackSeq.uint64Value == seq
+        if valid && msgType == "hotkey.capabilities" {
+            serverSupportsPairedGestures = obj["paired_gestures"] as? Bool ?? false
+        }
+        return valid
     }
 
     func sendToggleSignal() {

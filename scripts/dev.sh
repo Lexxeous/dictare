@@ -25,6 +25,8 @@ Usage: ./scripts/dev.sh
   pause               Stop listening on the local engine
   stop                Stop the verified local source engine
   hotkey              Simulate one source hotkey tap (no global shortcut)
+  hotkey-down         Simulate pressing the source hotkey
+  hotkey-up           Simulate releasing the source hotkey
   test [PYTEST_ARGS…] Run the repository tests
   lint                Run Ruff on source and tests
   typecheck           Run mypy on source
@@ -243,9 +245,9 @@ PY
         [[ $# -eq 0 ]] || error "The stop command does not accept arguments."
         set_local_listening engine.shutdown
         ;;
-    hotkey)
-        [[ $# -eq 0 ]] || error "The hotkey command does not accept arguments."
-        set_local_listening dev.hotkey
+    hotkey|hotkey-down|hotkey-up)
+        [[ $# -eq 0 ]] || error "The $command_name command does not accept arguments."
+        set_local_listening "dev.$command_name"
         ;;
     listen|pause)
         [[ $# -eq 0 ]] || error "The $command_name command does not accept extra arguments."

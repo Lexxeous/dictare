@@ -68,8 +68,10 @@ UI with ignored `.dictare-dev/` state and alternate ports. Use `listen` and
 `pause` for capture control; global hotkeys are disabled in source mode.
 `./scripts/dev.sh stop` stops only the verified source engine from this checkout;
 `./scripts/dev.sh hotkey` simulates one local source hotkey tap without a
-global shortcut. `test`, `lint`, and `typecheck` use the same checkout-local
-Python environment.
+global shortcut; `hotkey-down` and `hotkey-up` simulate individual edges.
+`DICTARE_DEV_EXPERIMENTAL_HOLD=1` forces the unfinished hold capture mode in
+source mode for isolated development; hold can also be selected in settings.
+`test`, `lint`, and `typecheck` use the same checkout-local Python environment.
 
 Use the repository's Python 3.11 environment:
 

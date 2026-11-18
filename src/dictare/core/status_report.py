@@ -96,6 +96,8 @@ def build_status(engine: DictareEngine) -> dict:
             },
             "hotkey": {
                 "key": engine.config.hotkey.key,
+                "activation_mode": "hold" if engine._experimental_hold else engine.config.hotkey.activation_mode,
+                "wake_state": ("capturing" if engine._phrase_gate.capturing else "waiting") if engine._phrase_gate else None,
                 "bound": hotkey_bound,
                 "status": hotkey_status_raw(engine),
             },

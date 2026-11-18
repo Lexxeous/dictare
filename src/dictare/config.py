@@ -192,6 +192,20 @@ def _default_hotkey() -> str:
 class HotkeyConfig(BaseModel):
     """Hotkey configuration."""
 
+    activation_mode: Literal["toggle", "hold", "wake"] = Field(
+        default="toggle",
+        description="Toggle listening, wait for a wake phrase, or hold the shortcut to capture a turn. Hold needs a working press/release hotkey; on macOS update and fully restart the app. A lost release cancels the turn. Linux and Windows hold have not been physically validated.",
+    )
+    wake_phrase: str = Field(default="hey dictare", max_length=200, description="While listening, transcribe locally and discard speech until this phrase. Supported words use Latin letters and digits; recognition depends on the selected speech model.")
+    end_phrase: str = Field(default="", max_length=200, description="Optional phrase to submit and close a wake-activated prompt. Without it, capture continues until listening stops. Voice commands are processed after the prompt is released.")
+
+    @model_validator(mode="after")
+    def validate_capture_phrases(self) -> HotkeyConfig:
+        if self.activation_mode == "wake":
+            from dictare.core.phrase_gate import PhraseGate
+
+            PhraseGate(self.wake_phrase, self.end_phrase)
+        return self
     key: str = Field(
         default_factory=_default_hotkey,
         description="Toggle listening key (evdev key name). Default: Command on macOS, Scroll Lock on Linux",
@@ -595,6 +609,38 @@ class Config(BaseModel):
         default="info",
         description="Logging level (debug, info, warning, error)",
     )
+
+    @model_validator(mode="after")
+    def validate_wake_command_conflicts(self) -> Config:
+        if self.hotkey.activation_mode != "wake":
+            return self
+        from dictare.pipeline.filters._text import match_pattern, normalize, tokenize
+
+        phrases = [tokenize(self.hotkey.wake_phrase)]
+        if self.hotkey.end_phrase.strip():
+            phrases.append(tokenize(self.hotkey.end_phrase))
+        if len(phrases) == 2 and (match_pattern(phrases[0], phrases[1], 0) or match_pattern(phrases[1], phrases[0], 0)):
+            raise ValueError("Wake and end phrases overlap; choose distinct phrases")
+        patterns: list[list[str]] = []
+        if self.pipeline.enabled:
+            if self.voice_commands.enabled:
+                for action in ("mute", "listen", "send"):
+                    patterns.extend(self.voice_commands.patterns(action)["*"])  # type: ignore[arg-type]
+            else:
+                if self.pipeline.mute_filter.enabled:
+                    for group in (self.pipeline.mute_filter.mute_triggers, self.pipeline.mute_filter.listen_triggers):
+                        patterns.extend(pattern for group_patterns in group.values() for pattern in group_patterns)
+                if self.pipeline.submit_filter.enabled:
+                    patterns.extend(pattern for group_patterns in self.pipeline.submit_filter.triggers.values() for pattern in group_patterns)
+        for phrase in phrases:
+            for pattern in patterns:
+                # Test both containment directions, including alternative words.
+                alternatives = [[normalize(word) for word in slot.split("|")] for slot in pattern]
+                remaining = iter(alternatives)
+                phrase_in_pattern = all(any(word in choices for choices in remaining) for word in phrase)
+                if phrase_in_pattern or match_pattern(phrase, pattern, 0):
+                    raise ValueError("Wake and end phrases must not overlap voice commands")
+        return self
 
 def get_config_dir() -> Path:
     """Get the configuration directory path."""

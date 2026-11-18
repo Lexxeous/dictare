@@ -203,6 +203,10 @@ def _run_serve(
                     on_key_up=controller.on_hotkey_key_up,
                     on_other_key=controller.on_hotkey_other_key,
                     on_combo=controller.on_hotkey_combo,
+                    paired_gestures=config.hotkey.activation_mode == "hold" or (
+                        os.environ.get("DICTARE_DEV_MODE") == "1"
+                        and os.environ.get("DICTARE_DEV_EXPERIMENTAL_HOLD") == "1"
+                    ),
                 )
                 hotkey_ipc.start()
                 _logger.info("Hotkey transport active: ipc+signal-fallback")

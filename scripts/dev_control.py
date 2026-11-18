@@ -41,10 +41,11 @@ def send_source_command(base_url: str, command: str) -> dict:
     checkout = os.environ.get("DICTARE_DEV_CHECKOUT")
     if not checkout or not isinstance(identity, dict) or identity.get("source") is not True or identity.get("checkout") != checkout:
         raise ValueError("The engine did not identify itself as this checkout’s source instance")
-    hotkey = command == "dev.hotkey"
+    hotkeys = {"dev.hotkey": "tap", "dev.hotkey-down": "down", "dev.hotkey-up": "up"}
+    event = hotkeys.get(command)
     request = Request(
-        base_url + ("/api/dev/hotkey" if hotkey else "/api/dev/control"),
-        data=json.dumps({} if hotkey else {"command": command}).encode(),
+        base_url + ("/api/dev/hotkey" if event else "/api/dev/control"),
+        data=json.dumps({"event": event} if event else {"command": command}).encode(),
         headers={"Content-Type": "application/json"},
     )
     with urlopen(request, timeout=5) as response:

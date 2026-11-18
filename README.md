@@ -206,6 +206,27 @@ Default hotkey: **Right ⌘** (macOS) / **Scroll Lock** (Linux).
 | **Double tap** | Submit (send Enter to agent) |
 | **Right Alt + hotkey** | Switch mode: agents ↔ keyboard |
 
+Hold and wake modes are in progress and still need physical and usability
+validation; see [the capture checkpoint](CAPTURE-HEADSET-CHECKPOINT.md).
+In Settings, **Capture shortcut behavior** also offers hold and wake modes.
+Hold captures one turn from press to release; if release is lost or the turn
+times out, Dictare discards it. On macOS, install the updated app and restart it
+fully after changing to hold. Linux and Windows hold have not been physically
+validated. A working shortcut is required.
+
+Wake mode runs the existing local speech recognizer while listening and drops
+recognized speech before the configured wake phrase. Phrase matching supports
+Latin letters and digits and depends on recognition quality. An optional end
+phrase buffers the prompt until that phrase, removes it, and submits the prompt;
+voice commands in the buffer run only when it is released. Without an end
+phrase, captured text is delivered normally until listening stops. Stopping,
+discarding, changing destinations, or a recognition timeout clears a pending
+prompt. Microphone activity remains visible on Home.
+
+AirPods click interception is not available: on the tested Mac, the observed
+gestures remained under system control and did not reach the tested event
+interfaces. No global media or Siri settings are changed.
+
 ## Service Management
 
 Run `dictare service --help` to see the complete service command list.

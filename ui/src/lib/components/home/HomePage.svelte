@@ -15,6 +15,7 @@
 	let waitingFor: boolean | null = $state(null);
 	let waitStarted = 0;
 	const active = $derived(status?.stt.active ?? false);
+	const hold = $derived(status?.platform.hotkey.activation_mode === "hold");
 	const strict = $derived(status?.platform.state === "strict_muted");
 	const loading = $derived(status?.platform.loading?.active ?? false);
 	const personal = $derived(getSchema()?.voice_commands ?? getSchema()?.values.voice_commands as { enabled?: boolean; mute?: string; listen?: string; send?: string } | undefined);
@@ -83,12 +84,13 @@
 <section class="px-4 space-y-6" aria-label="Everyday Dictare controls">
 	<div class="rounded-lg border p-5 space-y-4">
 		<p role="status" class="text-lg">{loading ? "Getting ready…" : strict && status?.platform.strict_mute_pending ? "Turning on strict mute…" : strict && status?.platform.strict_mute_error ? "Strict mute needs attention" : status ? listeningLabel(status.platform.state) : "Connecting to Dictare…"}</p>
-		<p class="text-sm text-muted-foreground">Speak naturally, then pause to let Dictare write your words.</p>
-		<Button size="lg" class="w-full sm:w-auto h-auto min-h-11 whitespace-normal" onclick={toggleListening} disabled={!status || loading || pending || waitingFor !== null || reviewPending || strict || strictRequest}>
+		<p class="text-sm text-muted-foreground">{hold ? "Hold your shortcut while speaking, then release it to finish." : "Speak naturally, then pause to let Dictare write your words."}</p>
+		{#if active && status?.platform.hotkey.activation_mode === "wake"}<p role="status" class="text-sm">{status.platform.hotkey.wake_state === "capturing" ? "Wake phrase heard; capturing prompt." : "Listening locally for the wake phrase."}</p>{/if}
+		{#if !hold}<Button size="lg" class="w-full sm:w-auto h-auto min-h-11 whitespace-normal" onclick={toggleListening} disabled={!status || loading || pending || waitingFor !== null || reviewPending || strict || strictRequest}>
 			{#if active}<MicOff />{:else}<Mic />{/if}
 			{strict ? "Resume with hotkey" : pending ? "Requesting change…" : waitingFor !== null ? "Waiting for listening to change…" : active ? "Stop listening" : "Start listening"}
 		</Button>
-		<p class="text-sm text-muted-foreground">Stopping listening keeps Dictare open. A current sentence may finish processing first.</p>
+		<p class="text-sm text-muted-foreground">Stopping listening keeps Dictare open. A current sentence may finish processing first.</p>{/if}
 		{#if strict}
 			{#if status?.platform.strict_mute_source_test}
 				<p class="text-sm">Use the development hotkey simulator to resume.</p>
@@ -107,7 +109,7 @@
 			</div>
 		{/if}
 		{#if status?.platform.state === "muted"}
-			<p class="text-sm">Voice mute still hears the “listen” command. Use Stop listening above to turn listening off.</p>
+			<p class="text-sm">{hold ? "Voice mute still hears the “listen” command." : "Voice mute still hears the “listen” command. Use Stop listening above to turn listening off."}</p>
 			{#if status.platform.voice_mute_pending}<p role="status" class="text-sm">Stopping audio…</p>{/if}
 			{#if status.platform.voice_mute_error}<p role="alert" class="text-sm text-destructive">Mute needs attention: {status.platform.voice_mute_error}</p>{/if}
 		{/if}
@@ -137,11 +139,13 @@
 	<div class="space-y-3 pb-4">
 		<h3 class="text-lg">Keyboard cheat sheet</h3>
 		<p>Your shortcut key: <strong>{status ? hotkeyLabel(status.platform.hotkey.key) : "Checking…"}</strong></p>
-		{#if status && !status.platform.hotkey.bound}<p class="text-sm">The shortcut is unavailable right now. You can use the listening button above.</p>{/if}
+		{#if status && !status.platform.hotkey.bound}<p class="text-sm">{hold ? "A complete shortcut press and release has not been verified. Update and restart the Dictare app, check its permissions, then try the shortcut." : "The shortcut is unavailable right now. You can use the listening button above."}</p>{/if}
 		<ul class="list-disc pl-5 space-y-2 text-sm">
+			{#if hold}<li>Hold the shortcut while speaking, and release it to finish.</li>{:else}
 			<li>Tap once to switch listening on or off.</li>
 			<li>Tap twice to send your words.</li>
 			<li>Hold Right Alt and tap the shortcut to switch between an assistant and typing into an app.</li>
+			{/if}
 		</ul>
 		<p class="text-sm text-muted-foreground">Use Documentation for the full guide. Keyboard settings let you change shortcuts.</p>
 	</div>

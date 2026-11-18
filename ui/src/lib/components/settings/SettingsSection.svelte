@@ -53,6 +53,13 @@
 	</div>
 {:else}
 	<div class="space-y-1">
+		{#if sections.includes("hotkey")}
+			<p class="text-sm text-muted-foreground py-3">
+				Headset click controls are unavailable. On the tested AirPods and Mac,
+				gestures did not reach the tested event interfaces; Siri and media controls
+				remain under system control.
+			</p>
+		{/if}
 		{#each fields as field (field.key)}
 			<FieldRenderer {field} schema={schema.schema} />
 		{/each}

@@ -52,7 +52,7 @@ export const SIZE_HINTS: Record<string, string> = {
 };
 
 /** Fields with enum/Literal types (fixed options from schema) */
-export const ENUM_FIELDS = new Set(["log_level", "output.mode", "tts.engine"]);
+export const ENUM_FIELDS = new Set(["hotkey.activation_mode", "log_level", "output.mode", "tts.engine"]);
 
 /** UI-friendly description overrides (replaces Pydantic description in the UI) */
 export const FIELD_DESCRIPTIONS: Record<string, string> = {
@@ -63,6 +63,9 @@ export const LABEL_OVERRIDES: Record<string, string> = {
   "audio.input_device": "Input Device",
   "audio.output_device": "Output Device",
   "hotkey.key": "Hotkey",
+  "hotkey.activation_mode": "Capture shortcut behavior",
+  "hotkey.wake_phrase": "Wake phrase",
+  "hotkey.end_phrase": "End phrase",
   "stt.language": "Speech language hint",
   "tts.language": "Voice accent",
   "tts.voice": "Speaker",

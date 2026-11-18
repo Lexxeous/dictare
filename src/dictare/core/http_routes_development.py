@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from typing import TYPE_CHECKING
 
@@ -31,9 +32,22 @@ def register_development_routes(app: FastAPI, server: OpenVIPServer) -> None:
 
     @app.post("/api/dev/hotkey")
     async def simulate_hotkey(request: Request):
-        """Simulate a tap without registering a competing global shortcut."""
+        """Simulate a tap or physical edge without a competing global shortcut."""
         _require_local_request(request)
         if server.controller is None:
             raise HTTPException(status_code=503, detail="Source controller is unavailable")
-        await asyncio.to_thread(server.controller.on_hotkey_tap)
+        raw = await request.body()
+        try:
+            body = json.loads(raw) if raw else {}
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail="Invalid hotkey event") from error
+        event = body.get("event", "tap") if isinstance(body, dict) else None
+        callbacks = {
+            "tap": server.controller.on_hotkey_tap,
+            "down": server.controller.on_hotkey_key_down,
+            "up": server.controller.on_hotkey_key_up,
+        }
+        if not isinstance(event, str) or event not in callbacks:
+            raise HTTPException(status_code=400, detail="Invalid hotkey event")
+        await asyncio.to_thread(callbacks[event])
         return {"status": "ok"}

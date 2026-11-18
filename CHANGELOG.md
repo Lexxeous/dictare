@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Add an optional macOS window for the existing local Dictare UI, with a
   separate menu-bar action and continued browser access.
+- Add local wake/end phrase capture and a hold-to-talk shortcut mode, with
+  bounded cancellation and visible capture state.
 - Add form controls for sound feedback, audio tuning, speech recognition,
   pipeline filters and default assistant settings, with advanced editors.
 - Add a separate strict mute that closes microphone input and audio until the
