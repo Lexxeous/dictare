@@ -1,0 +1,3 @@
+name = "provider-session-routing"
+bump = "minor"
+summary = "Route prompts to confirmed managed coding-agent sessions."
