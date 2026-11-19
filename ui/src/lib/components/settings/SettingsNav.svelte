@@ -85,8 +85,8 @@
 />
 
 <nav bind:this={navigation} aria-label="Settings navigation" style="--settings-bottom: {getFixedBottomPx()}px" class="relative z-30 w-full {desktopCollapsed ? 'sm:w-16 sm:border-r-0' : 'sm:w-52 sm:border-r'} shrink-0 border-b sm:border-b-0 bg-background sm:bg-background/50 sm:h-screen sm:overflow-y-auto p-3 flex flex-col">
-	<div class="flex items-start justify-between gap-2">
-		<button aria-label="Dictare Home" onclick={() => selectLeaf("home")} class="{desktopCollapsed ? 'sm:hidden' : ''} min-w-0 flex-1 px-3 py-2 text-left rounded-md focus-visible:ring-2 focus-visible:ring-ring">
+	<div class="mb-2 flex items-start justify-between gap-2">
+		<button aria-label="Dictare Home" onclick={() => selectLeaf("home")} class="{desktopCollapsed ? 'sm:hidden' : ''} min-w-0 flex-1 p-0 text-left rounded-md focus-visible:ring-2 focus-visible:ring-ring">
 			<span class="flex items-center gap-2">
 				<svg aria-hidden="true" class="shrink-0" width="24" height="24" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
 					<rect x="0" y="0" width="100" height="100" rx="22" fill="#6d5ce6"/>
@@ -103,10 +103,10 @@
 				<span title={version} class="mt-1 block break-all whitespace-normal text-[11px] text-muted-foreground">{version}</span>
 			{/if}
 		</button>
-		<button bind:this={menuButton} class="sm:hidden mt-2 shrink-0 flex size-10 items-center justify-center rounded-md border focus-visible:ring-2 focus-visible:ring-ring" aria-label={mobileOpen ? "Close settings menu" : "Open settings menu"} aria-expanded={mobileOpen} aria-controls="settings-pages" onclick={() => mobileOpen = !mobileOpen}>
+		<button bind:this={menuButton} class="sm:hidden shrink-0 flex size-10 items-center justify-center rounded-md border focus-visible:ring-2 focus-visible:ring-ring" aria-label={mobileOpen ? "Close settings menu" : "Open settings menu"} aria-expanded={mobileOpen} aria-controls="settings-pages" onclick={() => mobileOpen = !mobileOpen}>
 			{#if mobileOpen}<X aria-hidden="true" class="size-4" />{:else}<Menu aria-hidden="true" class="size-4" />{/if}
 		</button>
-		<button class="hidden sm:flex {desktopCollapsed ? '' : 'mt-2'} shrink-0 size-10 items-center justify-center rounded-md border focus-visible:ring-2 focus-visible:ring-ring" aria-label={desktopCollapsed ? "Open settings menu" : "Close settings menu"} aria-expanded={!desktopCollapsed} aria-controls="settings-pages" onclick={() => desktopCollapsed = !desktopCollapsed}>
+		<button class="hidden sm:flex shrink-0 size-10 items-center justify-center rounded-md border focus-visible:ring-2 focus-visible:ring-ring" aria-label={desktopCollapsed ? "Open settings menu" : "Close settings menu"} aria-expanded={!desktopCollapsed} aria-controls="settings-pages" onclick={() => desktopCollapsed = !desktopCollapsed}>
 			{#if desktopCollapsed}<Menu aria-hidden="true" class="size-4" />{:else}<X aria-hidden="true" class="size-4" />{/if}
 		</button>
 	</div>
