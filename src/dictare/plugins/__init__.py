@@ -39,6 +39,16 @@ def _discover_builtin_plugins() -> Iterator[type[Plugin]]:
     # Built-in plugins will be added here
     return iter([])
 
+def _is_plugin_class(candidate: object) -> bool:
+    """Check the class contract without using issubclass on a data protocol."""
+    return (
+        isinstance(candidate, type)
+        and all(hasattr(candidate, name) for name in ("name", "description", "get_commands", "on_load"))
+        and callable(getattr(candidate, "get_commands", None))
+        and callable(getattr(candidate, "on_load", None))
+    )
+
+
 def _discover_entrypoint_plugins() -> Iterator[type[Plugin]]:
     """Discover plugins from entry points.
 
@@ -54,7 +64,7 @@ def _discover_entrypoint_plugins() -> Iterator[type[Plugin]]:
         for ep in eps:
             try:
                 plugin_cls = ep.load()
-                if isinstance(plugin_cls, type) and issubclass(plugin_cls, Plugin):  # type: ignore[misc]
+                if _is_plugin_class(plugin_cls):
                     yield plugin_cls
             except Exception as e:
                 import logging
@@ -119,10 +129,9 @@ def _load_user_plugin(path: Path) -> type[Plugin] | None:
     for attr_name in dir(module):
         attr = getattr(module, attr_name)
         if (
-            isinstance(attr, type)
+            _is_plugin_class(attr)
             and attr is not Plugin
             and attr is not BasePlugin
-            and issubclass(attr, Plugin)  # type: ignore[misc]
         ):
             return attr
 

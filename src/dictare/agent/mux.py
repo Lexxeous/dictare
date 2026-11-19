@@ -955,7 +955,7 @@ def _print_session_summary(base_url: str) -> None:
 
     # Lifetime stats
     try:
-        from dictare.stats import load_stats
+        from dictare.utils.stats import load_stats
         lifetime = load_stats()
         lifetime_saved = lifetime.get("total_time_saved_seconds", 0)
         sessions = lifetime.get("sessions", 0)
