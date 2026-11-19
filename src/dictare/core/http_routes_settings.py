@@ -221,7 +221,7 @@ def register_settings_routes(app: FastAPI, server: OpenVIPServer) -> None:
         from dictare.tray.app import _native_launcher_running
 
         preview = os.environ.get("DICTARE_DEV_MODE") == "1"
-        bundle_id = "dev.dragfly.dictare.preview" if preview else "dev.dragfly.dictare"
+        bundle_id = os.environ.get("DICTARE_NATIVE_BUNDLE_ID") or ("dev.dragfly.dictare.preview" if preview else "dev.dragfly.dictare")
         if not _native_launcher_running(bundle_id):
             detail = "Run ./scripts/dev.sh app to start the source preview" if preview else "Start the updated Dictare app first"
             raise HTTPException(status_code=409, detail=detail)

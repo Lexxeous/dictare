@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add an isolated native develop runner with the real hotkey, tray, and app window.
 - Add an optional macOS window for the existing local Dictare UI, with a
   separate menu-bar action and continued browser access.
 - Add form controls for sound feedback, audio tuning, speech recognition,

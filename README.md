@@ -44,6 +44,20 @@ of window focus**. Your coding agent can be behind 3 other windows — it still 
 
 ## Install
 
+### Run the macOS develop app locally
+
+From a `develop` checkout, run `./scripts/dev.sh setup --mlx` once on Apple
+Silicon, then `./dev.sh`. Quit the installed Dictare app and stop its services
+first. The command builds the native app and bundled UI, starts its engine and
+tray, and opens the app. Keep the terminal open and press Ctrl-C to stop it.
+You can also quit from the tray or run `./dev.sh stop`; running `./dev.sh`
+again stops the existing development app from this checkout before rebuilding.
+The development app uses separate macOS permissions, settings and data under
+`.dictare-dev/`, and engine port 18770. Existing settings are copied on first
+use; later changes remain separate. Use `DICTARE_DEV_API_PORT` to choose a
+different port. The installed app can be started normally after the dev app
+exits. This workflow requires macOS, Xcode command-line tools and Node.js.
+
 **macOS, recommended** — [full guide](https://dictare.io/docs/installation/)
 
 ```bash

@@ -63,7 +63,7 @@ def build_status(engine: DictareEngine) -> dict:
 
     stt_active = stt_state not in ("off", "strict_muted")
     hotkey_bound = hotkey_active(engine)
-    source_hotkey = os.environ.get("DICTARE_DEV_MODE") == "1"
+    source_hotkey = os.environ.get("DICTARE_DEV_MODE") == "1" and os.environ.get("DICTARE_DEV_NATIVE") != "1"
 
     return {
         # OpenVIP protocol-level fields

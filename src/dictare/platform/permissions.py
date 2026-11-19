@@ -97,6 +97,9 @@ def _find_launcher() -> str | None:
     checked first. The brew Cellar path is a different TCC identity and may
     report false negatives when called from within a launchd service context.
     """
+    if os.environ.get("DICTARE_DEV_NATIVE") == "1":
+        return os.environ.get("DICTARE_DEV_LAUNCHER")
+
     from dictare.daemon.app_bundle import get_executable_path
 
     # 1. Use the service-installed bundle (the one registered in TCC)
@@ -178,9 +181,9 @@ def _check_input_monitoring() -> bool:
     create the CGEventTap.  "active"/"confirmed" mean permission is granted.
     Missing file means unknown, treated as granted for permission UI purposes.
     """
-    from pathlib import Path
+    from dictare.utils.paths import get_dictare_dir
 
-    status_file = Path.home() / ".dictare" / "hotkey_status"
+    status_file = get_dictare_dir() / "hotkey_status"
     try:
         content = status_file.read_text().strip()
         return content in ("active", "confirmed")
@@ -193,9 +196,9 @@ def _check_accessibility_runtime() -> bool | None:
     Returns:
         True/False when runtime file is present and parseable, otherwise None.
     """
-    from pathlib import Path
+    from dictare.utils.paths import get_dictare_dir
 
-    status_file = Path.home() / ".dictare" / "accessibility_status"
+    status_file = get_dictare_dir() / "accessibility_status"
     try:
         content = status_file.read_text().strip().lower()
     except FileNotFoundError:

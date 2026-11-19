@@ -20,6 +20,8 @@ Usage: ./scripts/dev.sh
   serve [ARGS…]       Run the local engine on port 18770
   ui                  Run the local settings UI on port 5173
   stack               Run the local engine and UI together
+  native              Build and run the full isolated macOS development app
+  native-stop         Stop this checkout's native development app
   app                 Build and open the isolated macOS source preview
   listen              Start listening on the local engine
   pause               Stop listening on the local engine
@@ -156,6 +158,68 @@ run_stack() {
     exit "$status"
 }
 
+run_native() {
+    [[ "$(uname -s)" == Darwin ]] || error "The native development app requires macOS."
+    require_python
+    require_ui_dependencies
+    prepare_local_environment
+    export DICTARE_DEV_NATIVE=1
+    export DICTARE_DEV_PYTHON="$VENV_PYTHON"
+    export DICTARE_NATIVE_BUNDLE_ID=dev.dragfly.dictare.develop
+    export DICTARE_HOTKEY_TRANSPORT=auto
+    (cd "$ROOT_DIR" && "$VENV_PYTHON" scripts/native_dev.py preflight "$API_PORT") || return $?
+    (cd "$ROOT_DIR/ui" && npm run build)
+
+    local app="$DEV_DIR/Dictare Develop.app" binary="$DEV_DIR/Dictare Develop.app/Contents/MacOS/DictareDevelop"
+    export DICTARE_DEV_LAUNCHER="$binary"
+    local hash_file="$DEV_DIR/native-launcher.sha256" source_hash old_hash
+    source_hash="$(shasum -a 256 "$ROOT_DIR/src/dictare/resources/launcher.swift" | cut -d ' ' -f 1)"
+    old_hash="$(cat "$hash_file" 2>/dev/null || true)"
+    if [[ ! -x "$binary" || "$source_hash" != "$old_hash" ]]; then
+        mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+        swiftc -O -o "$binary" "$ROOT_DIR/src/dictare/resources/launcher.swift"
+        cp "$ROOT_DIR/src/dictare/resources/Dictare.icns" "$app/Contents/Resources/Dictare.icns"
+        "$VENV_PYTHON" - "$app/Contents/Info.plist" <<'PYPLIST'
+import plistlib
+import sys
+with open(sys.argv[1], "wb") as output:
+    plistlib.dump({"CFBundleIdentifier": "dev.dragfly.dictare.develop", "CFBundleName": "Dictare Develop",
+                   "CFBundleDisplayName": "Dictare Develop", "CFBundleExecutable": "DictareDevelop",
+                   "CFBundlePackageType": "APPL", "CFBundleIconFile": "Dictare.icns", "LSUIElement": True,
+                   "NSMicrophoneUsageDescription": "Dictare Develop needs microphone access for voice-to-text.",
+                   "NSInputMonitoringUsageDescription": "Dictare Develop uses Input Monitoring for its global hotkey."}, output)
+PYPLIST
+        codesign --force --deep --sign - "$app"
+        printf '%s\n' "$source_hash" > "$hash_file"
+    fi
+    mkdir -p "$DEV_DIR/logs" "$DICTARE_RUNTIME_DIR" "$DICTARE_DATA_DIR"
+    local log="$DEV_DIR/logs/native-app.log"
+    printf 'Starting Dictare Develop. Keep this terminal open; press Ctrl-C to stop.\nLog: %s\n' "$log"
+    open -W -a "$app" --stdout "$DEV_DIR/logs/native-app.stdout.log" --stderr "$log" \
+        --env "DICTARE_DEV_MODE=$DICTARE_DEV_MODE" --env "DICTARE_DEV_NATIVE=$DICTARE_DEV_NATIVE" \
+        --env "DICTARE_DEV_CHECKOUT=$DICTARE_DEV_CHECKOUT" --env "DICTARE_DEV_VERSION=$DICTARE_DEV_VERSION" \
+        --env "DICTARE_DEV_PYTHON=$DICTARE_DEV_PYTHON" --env "DICTARE_DEV_LAUNCHER=$DICTARE_DEV_LAUNCHER" --env "DICTARE_NATIVE_BUNDLE_ID=$DICTARE_NATIVE_BUNDLE_ID" \
+        --env "DICTARE_CONFIG_PATH=$DICTARE_CONFIG_PATH" --env "DICTARE_RUNTIME_DIR=$DICTARE_RUNTIME_DIR" \
+        --env "DICTARE_DATA_DIR=$DICTARE_DATA_DIR" --env "DICTARE_SERVER_PORT=$DICTARE_SERVER_PORT" \
+        --env "DICTARE_SERVER_HOST=$DICTARE_SERVER_HOST" --env "DICTARE_CLIENT_URL=$DICTARE_CLIENT_URL" \
+        --env "DICTARE_API_TARGET=$DICTARE_API_TARGET" --env "DICTARE_HOTKEY_TRANSPORT=$DICTARE_HOTKEY_TRANSPORT" \
+        --env "PYTHONPATH=$PYTHONPATH" &
+    native_launch_pid=$!
+    "$VENV_PYTHON" "$ROOT_DIR/scripts/native_dev.py" show "$API_PORT" &
+    native_ready_pid=$!
+    cleanup_native() {
+        "$VENV_PYTHON" "$ROOT_DIR/scripts/native_dev.py" stop || true
+        kill "$native_ready_pid" 2>/dev/null || true
+        wait "$native_ready_pid" 2>/dev/null || true
+        kill "$native_launch_pid" 2>/dev/null || true
+        wait "$native_launch_pid" 2>/dev/null || true
+    }
+    trap cleanup_native EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    wait "$native_launch_pid"
+}
+
 set_local_listening() {
     require_python
     prepare_local_environment
@@ -200,6 +264,16 @@ case "$command_name" in
     stack)
         [[ $# -eq 0 ]] || error "The stack command does not accept extra arguments. Set DICTARE_DEV_API_PORT or DICTARE_DEV_UI_PORT to change ports."
         run_stack
+        ;;
+    native)
+        [[ $# -eq 0 ]] || error "The native command does not accept arguments."
+        run_native
+        ;;
+    native-stop)
+        [[ $# -eq 0 ]] || error "The native-stop command does not accept arguments."
+        require_python
+        export DICTARE_DEV_CHECKOUT="$ROOT_DIR"
+        "$VENV_PYTHON" "$ROOT_DIR/scripts/native_dev.py" stop
         ;;
     app)
         [[ $# -eq 0 ]] || error "The app command does not accept arguments."
@@ -264,7 +338,7 @@ PY
     lint)
         require_python
         cd "$ROOT_DIR"
-        exec "$VENV_PYTHON" -m ruff check src/ tests/ scripts/release_plan.py scripts/dev_process.py scripts/dev_control.py "$@"
+        exec "$VENV_PYTHON" -m ruff check src/ tests/ scripts/release_plan.py scripts/dev_process.py scripts/dev_control.py scripts/native_dev.py "$@"
         ;;
     typecheck)
         require_python

@@ -1810,7 +1810,7 @@ class DictareEngine:
 
             if self.review_pending():
                 return {"openvip": "1.0", "status": "error", "error": "Resolve the pending prompt first."}
-            if not self._strict_muted and os.environ.get("DICTARE_DEV_MODE") != "1" and not hotkey_active(self):
+            if not self._strict_muted and (os.environ.get("DICTARE_DEV_MODE") != "1" or os.environ.get("DICTARE_DEV_NATIVE") == "1") and not hotkey_active(self):
                 return {"openvip": "1.0", "status": "error", "error": "A working hotkey is required for strict mute."}
             if self.strict_mute() is False:
                 return {"openvip": "1.0", "status": "error", "error": "Resolve the pending prompt first."}

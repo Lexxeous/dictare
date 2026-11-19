@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import threading
 from collections.abc import Callable
@@ -309,10 +310,12 @@ class TrayApp:
 
         # Advanced submenu
         advanced_items = [
-            pystray.MenuItem("Restart Engine", self._on_restart_engine),
+            pystray.MenuItem("Restart Engine", self._on_restart_engine, enabled=os.environ.get("DICTARE_DEV_NATIVE") != "1"),
             pystray.Menu.SEPARATOR,
         ]
-        if self._state != "disconnected":
+        if os.environ.get("DICTARE_DEV_NATIVE") == "1":
+            pass  # The development launcher owns engine lifecycle.
+        elif self._state != "disconnected":
             advanced_items.append(
                 pystray.MenuItem("Stop Service", self._on_stop_service),
             )
@@ -323,7 +326,7 @@ class TrayApp:
         items.append(pystray.MenuItem("Advanced", pystray.Menu(*advanced_items)))
 
         if sys.platform == "darwin":
-            items.append(pystray.MenuItem("Open Dictare App", self._on_open_app, enabled=self._state != "disconnected" and _native_launcher_running()))
+            items.append(pystray.MenuItem("Open Dictare App", self._on_open_app, enabled=self._state != "disconnected" and _native_launcher_running(os.environ.get("DICTARE_NATIVE_BUNDLE_ID", "dev.dragfly.dictare"))))
 
         # Settings — opens config file in editor
         items.append(pystray.MenuItem("Settings...", self._on_open_settings))
@@ -485,7 +488,7 @@ class TrayApp:
             logger.warning("Native window requires a local engine address")
             return
         NSDistributedNotificationCenter.defaultCenter().postNotificationName_object_userInfo_deliverImmediately_(
-            "dev.dragfly.dictare.open-window", None, {"host": host, "port": server.port}, True
+            f"{os.environ.get('DICTARE_NATIVE_BUNDLE_ID', 'dev.dragfly.dictare')}.open-window", None, {"host": host, "port": server.port}, True
         )
 
     def _on_open_settings(
@@ -636,6 +639,14 @@ class TrayApp:
 
     def _on_quit(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         """Quit the application."""
+        if os.environ.get("DICTARE_DEV_NATIVE") == "1" and sys.platform == "darwin":
+            try:
+                from AppKit import NSRunningApplication
+
+                for app in NSRunningApplication.runningApplicationsWithBundleIdentifier_("dev.dragfly.dictare.develop"):
+                    app.terminate()
+            except Exception:
+                logger.warning("Could not quit the native development launcher", exc_info=True)
         if self._icon:
             self._icon.stop()
 

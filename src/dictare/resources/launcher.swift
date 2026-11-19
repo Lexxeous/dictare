@@ -126,7 +126,7 @@ func flagMaskForKeyCode(_ keyCode: Int64) -> CGEventFlags {
 /// Resolve the configured hotkey keycode from config.toml.
 /// Falls back to 54 (Right Cmd) if the file is missing or the key is unknown.
 func resolveHotkeyKeyCode() -> Int64 {
-    let configPath = NSHomeDirectory() + "/.config/dictare/config.toml"
+    let configPath = ProcessInfo.processInfo.environment["DICTARE_CONFIG_PATH"] ?? (NSHomeDirectory() + "/.config/dictare/config.toml")
     if let keyName = readTomlString(path: configPath, section: "hotkey", key: "key"),
        let code = evdevToKeyCode(keyName) {
         fputs("Hotkey: configured key=\(keyName) keyCode=\(code)\n", stderr)
@@ -139,7 +139,7 @@ func resolveHotkeyKeyCode() -> Int64 {
 /// Resolve the mode_switch_modifier flag mask from config.toml.
 /// Returns nil if the feature is disabled (key missing or empty).
 func resolveModeSwitchModifier() -> CGEventFlags? {
-    let configPath = NSHomeDirectory() + "/.config/dictare/config.toml"
+    let configPath = ProcessInfo.processInfo.environment["DICTARE_CONFIG_PATH"] ?? (NSHomeDirectory() + "/.config/dictare/config.toml")
     guard let keyName = readTomlString(path: configPath, section: "hotkey", key: "mode_switch_modifier"),
           !keyName.isEmpty,
           let code = evdevToKeyCode(keyName) else {
@@ -245,6 +245,7 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
     let restartBurstLimit = 5
 
     var childProcess: Process?
+    var trayProcess: Process?
     var restartWorkItem: DispatchWorkItem?
     var unexpectedExitTimes: [Date] = []
     var launcherIsTerminating = false
@@ -269,7 +270,7 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let preview = CommandLine.arguments.contains("--source-preview")
-        let notificationName = preview ? "dev.dragfly.dictare.preview.open-window" : "dev.dragfly.dictare.open-window"
+        let notificationName = ProcessInfo.processInfo.environment["DICTARE_NATIVE_BUNDLE_ID"].map { "\($0).open-window" } ?? (preview ? "dev.dragfly.dictare.preview.open-window" : "dev.dragfly.dictare.open-window")
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(openCompanion(_:)), name: Notification.Name(notificationName), object: nil)
         if preview {
             setupSignalHandling()
@@ -317,6 +318,7 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         restartWorkItem?.cancel()
         restartWorkItem = nil
         terminateChild()
+        if let tray = trayProcess, tray.isRunning { tray.terminate() }
         return .terminateNow
     }
 
@@ -348,6 +350,14 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
     // --- Tray app ---
     // Uses launchctl start which is idempotent: no-op if the service is already running.
     func ensureTrayRunning() {
+        if let python = ProcessInfo.processInfo.environment["DICTARE_DEV_PYTHON"], ProcessInfo.processInfo.environment["DICTARE_DEV_NATIVE"] == "1" {
+            let tray = Process()
+            tray.executableURL = URL(fileURLWithPath: python)
+            tray.arguments = ["-m", "dictare.tray.app"]
+            tray.environment = ProcessInfo.processInfo.environment
+            do { try tray.run(); trayProcess = tray } catch { fputs("Error starting development tray: \(error)\n", stderr) }
+            return
+        }
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/launchctl")
         task.arguments = ["start", "dev.dragfly.dictare.tray"]
@@ -367,8 +377,8 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         let binDir = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent()
         let bundleConfig = binDir.appendingPathComponent("python_path")
 
-        var pythonPath: String? = nil
-        for configFile in [externalConfig, bundleConfig] {
+        var pythonPath: String? = ProcessInfo.processInfo.environment["DICTARE_DEV_NATIVE"] == "1" ? ProcessInfo.processInfo.environment["DICTARE_DEV_PYTHON"] : nil
+        for configFile in (pythonPath == nil && ProcessInfo.processInfo.environment["DICTARE_DEV_NATIVE"] != "1") ? [externalConfig, bundleConfig] : [] {
             if let content = try? String(contentsOf: configFile, encoding: .utf8)
                 .trimmingCharacters(in: .whitespacesAndNewlines), !content.isEmpty {
                 pythonPath = content
@@ -574,16 +584,14 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
     }
 
     func writeHotkeyStatus(_ status: String) {
-        let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".dictare")
+        let dir = ProcessInfo.processInfo.environment["DICTARE_RUNTIME_DIR"].map { URL(fileURLWithPath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".dictare")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let file = dir.appendingPathComponent("hotkey_status")
         try? status.write(to: file, atomically: true, encoding: .utf8)
     }
 
     func writeAccessibilityStatus() {
-        let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".dictare")
+        let dir = ProcessInfo.processInfo.environment["DICTARE_RUNTIME_DIR"].map { URL(fileURLWithPath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".dictare")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let file = dir.appendingPathComponent("accessibility_status")
         let status = AXIsProcessTrusted() ? "granted" : "missing"
@@ -701,7 +709,7 @@ class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
 
     /// Send a single IPC message to the Python engine and wait for ACK.
     func sendIPCMessage(type msgType: String, seq: UInt64) -> Bool {
-        let socketPath = NSHomeDirectory() + "/.dictare/hotkey.sock"
+        let socketPath = (ProcessInfo.processInfo.environment["DICTARE_RUNTIME_DIR"] ?? (NSHomeDirectory() + "/.dictare")) + "/hotkey.sock"
         let maxPathLen = MemoryLayout.size(ofValue: sockaddr_un().sun_path)
         if socketPath.utf8.count >= maxPathLen {
             return false
