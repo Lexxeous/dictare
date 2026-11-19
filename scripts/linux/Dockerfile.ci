@@ -1,0 +1,12 @@
+FROM python:3.11
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libportaudio2 xvfb xauth \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
+ENV COVERAGE_FILE=/tmp/dictare-linux-coverage \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+CMD ["bash", "-c", "pip install -q -e '.[dev]' && printf '\\nStarting Linux test collection and coverage...\\n' && exec xvfb-run python -u -m pytest tests/ -v -m '' -o cache_dir=/tmp/dictare-pytest-cache --cov=dictare --cov-report=term-missing --cov-fail-under=90"]

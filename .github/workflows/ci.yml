@@ -31,7 +31,7 @@ jobs:
         run: bandit -r src/ -lll -q
 
       - name: Run tests with coverage
-        run: xvfb-run pytest tests/ -v -m '' --cov=dictare --cov-report=term-missing --cov-fail-under=45
+        run: xvfb-run pytest tests/ -v -m '' --cov=dictare --cov-report=term-missing --cov-fail-under=90
 
   typecheck:
     runs-on: ubuntu-latest

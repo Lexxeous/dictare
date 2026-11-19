@@ -272,6 +272,7 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "bandit" },
+    { name = "httpx" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -309,6 +310,7 @@ requires-dist = [
     { name = "faster-whisper", specifier = ">=1.0.0" },
     { name = "fastjsonschema", specifier = ">=2.20" },
     { name = "hidapi", marker = "sys_platform == 'darwin'", specifier = ">=0.14.0" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
     { name = "huggingface-hub", marker = "extra == 'mlx'", specifier = "==1.16.0" },
     { name = "mlx", marker = "extra == 'mlx'", specifier = "==0.30.4" },
     { name = "mlx-audio", marker = "extra == 'mlx'", specifier = "==0.3.0" },

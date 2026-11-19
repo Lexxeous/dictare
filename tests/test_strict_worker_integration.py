@@ -100,6 +100,7 @@ def test_worker_ack_waits_for_player_spawn_racing_with_mute(monkeypatch):
     engine.tts_mgr._worker_ready = True
     monkeypatch.setattr("dictare.audio.beep.suspend_feedback", lambda **kwargs: None)
     monkeypatch.setattr(base, "suspend_native_audio", lambda: None)
+    monkeypatch.setattr(base.shutil, "which", lambda name: "/fake/paplay" if name == "paplay" else None)
     process = MagicMock()
     process.terminate.side_effect = stopped.set
     process.wait.side_effect = lambda **kwargs: stopped.wait(timeout=2)
